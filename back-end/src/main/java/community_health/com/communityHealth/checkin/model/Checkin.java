@@ -1,5 +1,9 @@
-package community_health.com.communityHealth.usuario.model;
+package community_health.com.communityHealth.usuario.model.checkin;
 
+import community_health.com.communityHealth.usuario.model.Comment;
+import community_health.com.communityHealth.usuario.model.Group;
+import community_health.com.communityHealth.usuario.model.Reaction;
+import community_health.com.communityHealth.usuario.model.user.User;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
