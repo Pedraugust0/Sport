@@ -1,4 +1,4 @@
-package community_health.com.communityHealth.usuario.model.checkin;
+package community_health.com.communityHealth.checkin.model;
 
 // CheckinMetrics.java
 // Usamos @Embeddable para que esses campos fiquem na tabela 'checkins'

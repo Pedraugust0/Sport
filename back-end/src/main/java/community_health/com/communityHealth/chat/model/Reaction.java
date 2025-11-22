@@ -1,7 +1,7 @@
-package community_health.com.communityHealth.usuario.model;
+package community_health.com.communityHealth.chat.model;
 
-import community_health.com.communityHealth.usuario.model.checkin.Checkin;
-import community_health.com.communityHealth.usuario.model.user.User;
+import community_health.com.communityHealth.checkin.model.Checkin;
+import community_health.com.communityHealth.usuario.model.User;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.util.UUID;

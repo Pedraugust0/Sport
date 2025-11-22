@@ -1,7 +1,7 @@
-package community_health.com.communityHealth.usuario.model;
+package community_health.com.communityHealth.group.model;
 
-import community_health.com.communityHealth.usuario.model.user.Role;
-import community_health.com.communityHealth.usuario.model.user.User;
+import community_health.com.communityHealth.usuario.model.Role;
+import community_health.com.communityHealth.usuario.model.User;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;

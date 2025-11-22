@@ -1,4 +1,4 @@
-package community_health.com.communityHealth.usuario.model.user;
+package community_health.com.communityHealth.usuario.model;
 
 // Role.java
 public enum Role {
