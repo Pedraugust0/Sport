@@ -1,5 +1,6 @@
 package community_health.com.communityHealth.group.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import community_health.com.communityHealth.checkin.model.Checkin;
 import community_health.com.communityHealth.usuario.model.User;
 import jakarta.persistence.*;
@@ -18,6 +19,16 @@ public class Group {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
+
+    // ANOTAÇÃO PARA QUEBRAR O CICLO: Não serialize os membros ao serializar o Grupo
+    @JsonIgnore
+    @OneToMany(mappedBy = "group")
+    private List<GroupMember> members;
+
+    // ANOTAÇÃO PARA QUEBRAR O CICLO: Não serialize os checkins ao serializar o Grupo
+    @JsonIgnore
+    @OneToMany(mappedBy = "group")
+    private List<Checkin> checkins;
 
     @ManyToOne
     @JoinColumn(name = "owner_id", nullable = false)
@@ -44,13 +55,6 @@ public class Group {
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
-
-    // --- Relacionamentos ---
-    @OneToMany(mappedBy = "group")
-    private List<GroupMember> members;
-
-    @OneToMany(mappedBy = "group")
-    private List<Checkin> checkins;
 
     // --- Lógica Calculada (Não vai para o Banco) ---
     @Transient

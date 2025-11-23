@@ -11,7 +11,6 @@ import java.util.List;
 @Table(name = "Users")
 @NoArgsConstructor
 public class User {
-    sout
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     private Long id;

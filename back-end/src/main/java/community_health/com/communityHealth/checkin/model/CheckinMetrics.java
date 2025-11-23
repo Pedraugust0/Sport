@@ -1,22 +1,23 @@
 package community_health.com.communityHealth.checkin.model;
 
-// CheckinMetrics.java
-// Usamos @Embeddable para que esses campos fiquem na tabela 'checkins'
-// mas agrupados num objeto Java.
 import jakarta.persistence.Embeddable;
-import jakarta.persistence.Column;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
+// Marca que esta classe pode ser embutida em outras entidades
 @Embeddable
-@Data
+@Data // Gera Getters, Setters, toString, equals, hashCode (Lombok)
+@NoArgsConstructor
+@AllArgsConstructor
 public class CheckinMetrics {
 
-    @Column(name = "metric_distance_km")
-    private Double distanceKm;
+    // Distância percorrida (km)
+    private Double distanciaKm;
 
-    @Column(name = "metric_duration_min")
-    private Integer durationMin;
+    // Duração da atividade (minutos)
+    private Integer duracaoMin;
 
-    @Column(name = "metric_steps")
-    private Integer steps;
+    // Número de passos
+    private Integer passos;
 }

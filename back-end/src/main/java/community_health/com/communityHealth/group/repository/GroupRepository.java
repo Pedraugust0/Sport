@@ -8,13 +8,13 @@ import java.util.UUID;
 import java.util.List;
 
 @Repository
-// MUDANÇA CRÍTICA: O JpaRepository deve usar UUID, não Long.
-public interface GroupRepository extends JpaRepository<Group, UUID> { // <-- CORREÇÃO AQUI
+// MUDANÇA CRÍTICA: O JpaRepository DEVE usar UUID, que é o tipo da chave primária na entidade Group.
+public interface GroupRepository extends JpaRepository<Group, UUID> { // <-- CORREÇÃO APLICADA AQUI
 
     // Exemplo: Encontrar todos os grupos que não são privados
     List<Group> findByIsPrivateFalse();
 
-    // Exemplo: Encontrar grupos pelo ID do Owner
-    // Se o ID do Owner for Long (como parece estar no seu GroupService), isso está OK.
+    // Exemplo: Encontrar grupos pelo ID do Owner (Long)
+    // O ID do Owner é Long, então este método está correto:
     List<Group> findByOwnerId(Long ownerId);
 }

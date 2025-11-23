@@ -11,7 +11,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "Comments")
 @Data
-public class Comment {
+public class CommentChat {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
