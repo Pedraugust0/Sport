@@ -9,7 +9,7 @@ import GroupInfoScreen from './components/groupInfoScreen';
 import CreateGroupModal from './components/createGroupModal';
 import ChatScreen from './components/chatScreen';
 // Importe as funções da API
-import { createGroup, getAllGroups } from './services/groupService';
+import { createGroup, getAllGroups, createCheckin, getCheckinsByGroupId, createComment } from './services/groupService'; // <-- 🔑 IMPORTAÇÃO AJUSTADA
 
 // Importações locais (imagens)
 import daviPhoto from './imagens/Davi.jpeg';
@@ -25,11 +25,42 @@ function App() {
   // Estados de UI
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activities, setActivities] = useState([]);
-  const [selectedCheckin, setSelectedCheckin] = useState(null);
+  const [selectedCheckin, setSelectedCheckin] = useState(null); // Agora armazenará o ID da API
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [isCreateGroupModalOpen, setIsCreateGroupModalOpen] = useState(false);
   const [showChat, setShowChat] = useState(false);
+
+  // -------------------------------------------------------------
+  // 🆕 FUNÇÃO AUXILIAR: Mapeia dados da API (Checkin Java) para a UI (ActivityFeed React)
+  // -------------------------------------------------------------
+  const mapApiCheckinsToUI = (apiCheckins) => {
+    // Garante que os check-ins mais recentes apareçam primeiro
+    return apiCheckins.map(apiCheckin => ({
+        // 🔑 Adiciona o ID real do backend para ser usado no modal de detalhes/comentários
+        apiId: apiCheckin.id,
+        date: new Date(apiCheckin.createdAt).toLocaleDateString(),
+        user: { name: apiCheckin.user ? apiCheckin.user.name : 'Davi de Souza' },
+        userPhoto: daviPhoto,
+        activity: apiCheckin.tituloAtividade,
+        description: apiCheckin.descricao || '',
+        time: new Date(apiCheckin.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        photo: null,
+        metrics: {
+            distance: apiCheckin.metricas.distanciaKm > 0 ? `${apiCheckin.metricas.distanciaKm} km` : null,
+            duration: apiCheckin.metricas.duracaoMin > 0 ? `${apiCheckin.metricas.duracaoMin} min` : null,
+            steps: apiCheckin.metricas.passos > 0 ? `${apiCheckin.metricas.passos} passos` : null,
+        },
+    })).sort((a, b) => new Date(b.time) - new Date(a.time));
+  };
+
+  // 🆕 FUNÇÃO AUXILIAR: Carrega e define o estado das atividades
+  const loadCheckins = async (groupId) => {
+      const fetchedCheckins = await getCheckinsByGroupId(groupId);
+      const mappedActivities = mapApiCheckinsToUI(fetchedCheckins);
+      setActivities(mappedActivities);
+  }
+  // -------------------------------------------------------------
 
   // 2. LÓGICA DE CARREGAMENTO INICIAL (Substitui os Mocks)
   useEffect(() => {
@@ -53,6 +84,9 @@ function App() {
             description: firstGroup.description,
             isPrivate: firstGroup.isPrivate,
           });
+
+          // 🚀 CHAMA A BUSCA DE CHECK-INS APÓS CARREGAR O PRIMEIRO GRUPO
+          await loadCheckins(firstGroup.id);
         }
       } catch (error) {
         console.error("Falha ao carregar grupos iniciais:", error);
@@ -66,37 +100,31 @@ function App() {
 
   // --- FUNÇÕES ---
 
-  const handleNewCheckin = (data) => {
-    // ⚠️ Lógica de Check-in (mantida como mock, precisará de API)
-    const now = new Date();
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const currentTime = `${hours}:${minutes}`;
-
-    let photoUrl = null;
-    if (data.photo) {
-      photoUrl = URL.createObjectURL(data.photo);
+  // Lógica de criação de Check-in (Modificada para usar a API)
+  const handleNewCheckin = async (data) => {
+    if (!currentGroup) {
+        alert("Selecione um grupo para fazer o check-in.");
+        return;
     }
 
-    const metrics = {};
-    if (data.distance) metrics.distance = `${data.distance} km`;
-    if (data.duration) metrics.duration = `${data.duration} min`;
-    if (data.steps) metrics.steps = `${data.steps} passos`;
+    const currentGroupId = currentGroup.id;
 
-    const newCheckin = {
-      date: 'Hoje',
-      user: { name: 'Davi de Souza' },
-      userPhoto: daviPhoto,
-      activity: data.title,
-      description: data.description || '',
-      time: currentTime,
-      photo: photoUrl,
-      metrics: Object.keys(metrics).length > 0 ? metrics : null,
-    };
+    try {
+        const newCheckinFromApi = await createCheckin(data, currentGroupId);
 
-    setActivities([newCheckin, ...activities]);
+        // 3. Mapeamento dos Dados para a UI (reutiliza o mapper)
+        const newCheckinForUI = mapApiCheckinsToUI([newCheckinFromApi])[0];
+
+        // 4. Atualiza a UI, adicionando o novo item no topo
+        setActivities(prevActivities => [newCheckinForUI, ...prevActivities]);
+        setIsModalOpen(false);
+    } catch (error) {
+        console.error("Erro ao salvar Check-in via API:", error);
+        alert(`Falha ao criar Check-in. Detalhe: ${error.message}`);
+    }
   };
 
+  // 🔑 ATUALIZADO: Define o Checkin selecionado (incluindo apiId)
   const handleCheckinClick = (checkin) => {
     setSelectedCheckin(checkin);
     setIsDetailModalOpen(true);
@@ -118,7 +146,8 @@ function App() {
     };
     setCurrentGroupData(groupData);
 
-    setActivities([]);
+    // 🚀 CHAMA A BUSCA DE CHECK-INS AO TROCAR DE GRUPO
+    loadCheckins(group.id);
   };
 
   //Lógica de criação de Grupo
@@ -155,7 +184,10 @@ function App() {
          // Atualiza o estado da aplicação para o novo grupo
          setCurrentGroup(newGroupFromApi);
          setCurrentGroupData(newGroupData);
+
+         // Limpa e recarrega as atividades (que será uma lista vazia para o novo grupo)
          setActivities([]);
+
          setIsCreateGroupModalOpen(false); // Fecha o modal
      } catch (error) {
          console.error("Falha ao criar grupo:", error);
@@ -255,9 +287,11 @@ function App() {
 
       {/* Modal de Detalhes do Check-in */}
       <CheckinDetailModal
-        isOpen={isDetailModalOpen}
-        onClose={() => setIsDetailModalOpen(false)}
-        checkin={selectedCheckin}
+          isOpen={isDetailModalOpen}
+          onClose={() => setIsDetailModalOpen(false)}
+          checkin={selectedCheckin}
+          // 🔑 A ÚNICA ALTERAÇÃO NECESSÁRIA AQUI
+          onCreateComment={createComment}
       />
 
       {/* Modal de Criar Grupo */}

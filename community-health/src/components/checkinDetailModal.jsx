@@ -1,33 +1,138 @@
-import React, { useState } from 'react';
-import { ArrowLeft, Heart, MessageCircle, Smile, Clock, MapPin, Footprints } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, MessageCircle, Smile, Clock, MapPin, Footprints } from 'lucide-react';
+// 🔑 Importar a função de busca para carregar dados existentes
+import { getCommentsByCheckinId } from '../services/groupService';
+
 import daviPhoto from '../imagens/Davi.jpeg';
 
-const CheckinDetailModal = ({ isOpen, onClose, checkin }) => {
-  const [comment, setComment] = useState('');
+// Recebe as props de API: onCreateComment (envio)
+const CheckinDetailModal = ({ isOpen, onClose, checkin, onCreateComment }) => { // 🔑 Recebe onCreateComment
+
+  const [commentText, setCommentText] = useState(''); // Renomeado para evitar conflito com 'comment' da prop
   const [comments, setComments] = useState([]);
-  const [reactions, setReactions] = useState({});
+  const [reactions, setReactions] = useState({}); // Estado das reações vindas do backend
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [loadingComments, setLoadingComments] = useState(false); // Novo estado de carregamento
 
   const availableEmojis = ['❤️', '💪', '🔥', '👏', '👍'];
 
-  const handleAddComment = (e) => {
-    e.preventDefault();
-    if (comment.trim()) {
-      setComments([
-        { id: Date.now(), user: 'Davi de Souza', text: comment, time: 'Agora', userPhoto: daviPhoto },
-        ...comments,
-      ]);
-      setComment('');
+  // -------------------------------------------------------------
+  // FUNÇÃO DE SINCRONIZAÇÃO: Carrega dados do Backend
+  // -------------------------------------------------------------
+  const loadInitialData = async (checkinId) => {
+    if (!checkinId) return;
+
+    setLoadingComments(true);
+    try {
+        const fetchedComments = await getCommentsByCheckinId(checkinId);
+
+        // 1. Processar Reações
+        const newReactions = {};
+        let commentIdCounter = Date.now(); // Para garantir chaves únicas no mock
+
+        // Filtra para separar reações de comentários de texto
+        const textComments = fetchedComments.filter(c => {
+            if (c.reactionEmoji) {
+                // Conta as reações (se o backend salvar cada reação como um objeto Comment)
+                newReactions[c.reactionEmoji] = (newReactions[c.reactionEmoji] || 0) + 1;
+                return false; // É uma reação, não um comentário de texto
+            }
+            return true; // É um comentário de texto
+        });
+
+        setReactions(newReactions);
+
+        // 2. Mapear Comentários de Texto
+        const mappedComments = textComments.map((c) => ({
+            id: c.id, // ID real do backend
+            user: c.user ? c.user.name : 'Membro',
+            text: c.content,
+            time: new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            userPhoto: daviPhoto, // Mock até ter a foto do user real
+        })).sort((a, b) => new Date(a.time) - new Date(b.time)); // Ordena para cronologia
+
+        setComments(mappedComments);
+
+    } catch (error) {
+        console.error("Erro ao carregar dados do Check-in:", error);
+    } finally {
+        setLoadingComments(false);
     }
   };
 
-  const handleReaction = (emoji) => {
-    setReactions({
-      ...reactions,
-      [emoji]: (reactions[emoji] || 0) + 1,
-    });
-    setShowEmojiPicker(false);
+  // -------------------------------------------------------------
+  // EFEITO: CARREGAR DADOS NA ABERTURA/TROCA DE CHECK-IN
+  // -------------------------------------------------------------
+  useEffect(() => {
+    if (isOpen && checkin?.apiId) {
+      loadInitialData(checkin.apiId);
+      setCommentText('');
+      // ⚠️ IMPORTANTE: Se o checkin.apiId não estiver sendo passado na key do componente pai,
+      // este useEffect precisa lidar com a limpeza manual se a prop 'checkin' mudar.
+    } else {
+        // Limpar estados ao fechar o modal
+        setComments([]);
+        setReactions({});
+    }
+  }, [isOpen, checkin?.apiId]); // 🔑 Depende da abertura e do ID do Check-in
+
+  // -------------------------------------------------------------
+  // FUNÇÕES DE SUBMISSÃO (Integração com a API)
+  // -------------------------------------------------------------
+
+  // 🔑 Substitui handleAddComment: Envio de Comentário de Texto
+  const handleSendComment = async (e) => {
+    e.preventDefault();
+    if (commentText.trim() === '' || loadingComments || !checkin?.apiId) return;
+
+    try {
+        const newCommentApi = await onCreateComment(
+            checkin.apiId,
+            commentText,
+            null // Não é uma reação de emoji
+        );
+
+        // Mapeia o objeto retornado pela API para a UI e adiciona localmente
+        const newCommentForUI = {
+            id: newCommentApi.id,
+            user: newCommentApi.user ? newCommentApi.user.name : 'Você', // Deve ser o nome do usuário logado
+            text: newCommentApi.content,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            userPhoto: daviPhoto,
+        };
+
+        setComments(prev => [...prev, newCommentForUI]);
+        setCommentText('');
+
+    } catch (error) {
+        alert('Falha ao enviar comentário.');
+        console.error(error);
+    }
   };
+
+  // 🔑 Substitui handleReaction: Envio de Reação/Emoji
+  const handleSendReaction = async (emoji) => {
+    if (loadingComments || !checkin?.apiId) return;
+
+    try {
+        // Envia a reação (Conteúdo nulo, apenas emoji)
+        await onCreateComment(checkin.apiId, null, emoji);
+
+        // Atualiza o estado local para dar feedback imediato
+        setReactions(prev => ({
+            ...prev,
+            [emoji]: (prev[emoji] || 0) + 1,
+        }));
+
+        setShowEmojiPicker(false);
+
+    } catch (error) {
+        alert('Falha ao enviar reação.');
+        console.error(error);
+    }
+  };
+
+  // -------------------------------------------------------------
 
   if (!isOpen || !checkin) return null;
 
@@ -65,8 +170,8 @@ const CheckinDetailModal = ({ isOpen, onClose, checkin }) => {
           <div className="pb-4">
             <div className="flex items-center gap-2 mb-4">
               {checkin.userPhoto ? (
-                <img 
-                  src={checkin.userPhoto} 
+                <img
+                  src={checkin.userPhoto}
                   alt={checkin.user.name}
                   className="w-8 h-8 rounded-full object-cover"
                 />
@@ -120,7 +225,8 @@ const CheckinDetailModal = ({ isOpen, onClose, checkin }) => {
                 {Object.entries(reactions).map(([emoji, count]) => (
                   <button
                     key={emoji}
-                    onClick={() => handleReaction(emoji)}
+                    // ⚠️ Nota: Clicar aqui deve remover a reação, mas por simplicidade, apenas chama o handler.
+                    onClick={() => handleSendReaction(emoji)}
                     className="flex items-center gap-1 px-3 py-1.5 rounded-full text-white hover:opacity-90 transition-opacity"
                     style={{ background: '#2E67D3' }}
                   >
@@ -130,7 +236,7 @@ const CheckinDetailModal = ({ isOpen, onClose, checkin }) => {
                 ))}
               </div>
             )}
-            
+
             {/* Botão de reagir */}
             <div className="relative">
               <button
@@ -146,7 +252,7 @@ const CheckinDetailModal = ({ isOpen, onClose, checkin }) => {
                   {availableEmojis.map((emoji) => (
                     <button
                       key={emoji}
-                      onClick={() => handleReaction(emoji)}
+                      onClick={() => handleSendReaction(emoji)} // 🔑 Chama a função de envio de reação
                       className="text-2xl hover:scale-125 transition-transform"
                     >
                       {emoji}
@@ -160,53 +266,57 @@ const CheckinDetailModal = ({ isOpen, onClose, checkin }) => {
           {/* Comentários */}
           <div className="py-4">
             {/* Lista de comentários */}
-            {comments.length > 0 && (
-              <div className="space-y-3 mb-4">
-                {comments.map((c) => (
-                  <div key={c.id} className="flex gap-2 items-start">
-                    {c.userPhoto ? (
-                      <img 
-                        src={c.userPhoto} 
-                        alt={c.user}
-                        className="w-7 h-7 rounded-full object-cover flex-shrink-0"
-                      />
-                    ) : (
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0" style={{ background: '#2E67D3' }}>
-                        {c.user.charAt(0)}
-                      </div>
-                    )}
-                    <div className="flex-1">
-                      <p className="text-sm">
-                        <span className="font-semibold" style={{ color: '#212121' }}>{c.user}</span> 
-                        <span className="text-gray-400 ml-1 text-xs">{c.time}</span>
-                      </p>
-                      <p className="text-sm mt-0.5" style={{ color: '#212121' }}>{c.text}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            {loadingComments ? (
+                <p className="text-gray-500 text-sm">Carregando comentários...</p>
+            ) : comments.length > 0 ? (
+                <div className="space-y-3 mb-4">
+                    {comments.map((c) => (
+                        <div key={c.id} className="flex gap-2 items-start">
+                            {c.userPhoto ? (
+                            <img
+                                src={c.userPhoto}
+                                alt={c.user}
+                                className="w-7 h-7 rounded-full object-cover flex-shrink-0"
+                            />
+                            ) : (
+                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0" style={{ background: '#2E67D3' }}>
+                                {c.user.charAt(0)}
+                            </div>
+                            )}
+                            <div className="flex-1">
+                            <p className="text-sm">
+                                <span className="font-semibold" style={{ color: '#212121' }}>{c.user}</span>
+                                <span className="text-gray-400 ml-1 text-xs">{c.time}</span>
+                            </p>
+                            <p className="text-sm mt-0.5" style={{ color: '#212121' }}>{c.text}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <p className="text-gray-500 text-sm">Nenhum comentário ainda.</p>
             )}
-
-            {/* Adicionar comentário */}
-            <form onSubmit={handleAddComment} className="flex gap-2">
-              <input
-                type="text"
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                placeholder="Adicione um comentário..."
-                className="flex-1 px-4 py-2 border rounded-full focus:outline-none focus:ring-2 transition-all"
-                style={{ borderColor: '#EDEDED', backgroundColor: '#FFFFFF' }}
-              />
-              <button
-                type="submit"
-                className="px-6 py-2 text-white rounded-full font-semibold hover:opacity-90 transition-opacity"
-                style={{ background: '#2E67D3' }}
-              >
-                Enviar
-              </button>
-            </form>
           </div>
         </div>
+
+        {/* Adicionar comentário (Rodapé) */}
+        <form onSubmit={handleSendComment} className="flex gap-2 p-4 border-t" style={{ background: '#FFFFFF' }}>
+          <input
+            type="text"
+            value={commentText} // 🔑 Usando commentText
+            onChange={(e) => setCommentText(e.target.value)}
+            placeholder="Adicione um comentário..."
+            className="flex-1 px-4 py-2 border rounded-full focus:outline-none focus:ring-2 transition-all"
+            style={{ borderColor: '#EDEDED', backgroundColor: '#FFFFFF' }}
+          />
+          <button
+            type="submit"
+            className="px-6 py-2 text-white rounded-full font-semibold hover:opacity-90 transition-opacity"
+            style={{ background: '#2E67D3' }}
+          >
+            Enviar
+          </button>
+        </form>
       </div>
     </div>
   );
