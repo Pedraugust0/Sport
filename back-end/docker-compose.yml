@@ -1,0 +1,40 @@
+# Versão do formato do arquivo Compose. '3.8' é uma versão moderna e estável.
+#version: '3.8'
+
+# Bloco onde definimos todos os nossos serviços (containers).
+services:
+  # O nome do nosso serviço. Pode ser qualquer nome, aqui usamos 'mysql-db'.
+  mysql-db:
+    # A imagem Docker que será usada. Aqui, usamos a imagem oficial do MySQL na versão 8.0.
+    # Você pode usar outras tags como 'latest' ou '5.7'.
+    image: mysql:8.0
+
+    # Define um nome fixo para o container, facilitando a identificação.
+    container_name: mysql
+
+    # Política de reinicialização. 'always' garante que o container suba automaticamente
+    # se o Docker for reiniciado ou se o container parar por algum motivo.
+    restart: always
+
+    # Variáveis de ambiente necessárias para configurar o MySQL na primeira inicialização.
+    environment:
+      MYSQL_ROOT_PASSWORD: root          # Senha para o usuário 'root'.
+      MYSQL_DATABASE: community_health    # Nome do banco de dados que será criado automaticamente.
+      MYSQL_USER: user_app            # Cria um usuário dedicado para a aplicação.
+      MYSQL_PASSWORD: 12344321        # Senha para o usuário dedicado.
+
+    # Mapeamento de portas. Expõe a porta do container para a sua máquina local.
+    # Formato: "PORTA_NA_SUA_MAQUINA:PORTA_DENTRO_DO_CONTAINER"
+    ports:
+      - "3306:3306"
+
+    # Gerenciamento de volumes. Essencial para que os dados do banco não se percam
+    # quando o container for parado ou recriado.
+    volumes:
+      # Cria um "volume nomeado" chamado 'mysql-data' e o associa à pasta onde
+      # o MySQL guarda os dados dentro do container (/var/lib/mysql).
+      - mysql-data:/var/lib/mysql
+
+# Bloco para declarar os volumes nomeados que usamos acima.
+volumes:
+  mysql-data:
