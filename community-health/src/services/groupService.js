@@ -1,3 +1,5 @@
+// src/services/groupService.js
+
 // 🚩 Defina a URL da API no topo do arquivo
 const API_URL_BASE = "http://localhost:8080/api";
 
@@ -195,10 +197,12 @@ export async function uploadImage(file) {
 }
 
 /**
- * NOVO MÉTODO: Atualiza a URL da imagem de um grupo existente (PUT /api/groups/{groupId}).
+ * 🔑 NOVO MÉTODO: Atualiza a URL da imagem de um grupo existente.
+ * CORRIGIDO: Assume que o backend espera PUT em /api/groups/{groupId}/image
  */
 export async function updateGroupImageUrl(groupId, imageUrl) {
-    const API_URL = `${API_URL_BASE}/groups/${groupId}`;
+    // 🔑 ROTA CORRIGIDA: Adiciona '/image' para rota mais específica
+    const API_URL = `${API_URL_BASE}/groups/${groupId}/image`;
 
     // Apenas envia o campo imageUrl que deve ser atualizado.
     const dataToSend = { imageUrl: imageUrl };
@@ -211,8 +215,8 @@ export async function updateGroupImageUrl(groupId, imageUrl) {
         });
 
         if (!res.ok) {
-            const errorText = await res.text();
-            throw new Error(`Erro ${res.status} ao atualizar imagem do grupo: ${errorText}`);
+            const errorBody = await res.json();
+            throw new Error(`Erro ${res.status} ao atualizar imagem do grupo: ${JSON.stringify(errorBody)}`);
         }
 
         return res.json();

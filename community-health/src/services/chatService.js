@@ -39,23 +39,29 @@ export const getChatHistory = async (groupId) => {
 
 /**
  * 2. Conecta ao WebSocket e Assina o Tópico do Grupo
+ * 🔑 ALTERADO: Aceita um callback para notificar o componente sobre o status da conexão.
  */
-export const connectAndSubscribe = (groupId, onMessageReceived) => {
+export const connectAndSubscribe = (groupId, onMessageReceived, onConnectStatusChange) => {
 
-    // 🔑 CORREÇÃO PARA "Stomp.over is not a constructor"
-    // Verifica se a exportação default está aninhada (comum em bundlers)
     const StompClient = Stomp.Stomp ? Stomp.Stomp : Stomp;
 
-    // Agora StompClient.over deve ser uma função válida
-    stompClient = StompClient.over(function() {
+    // 1. Cria uma nova instância local
+    const clientInstance = StompClient.over(function() { // 🔑 Usa uma variável local
         return new SockJS(WS_URL);
     });
 
-    stompClient.connect({}, (frame) => {
+    // 2. Atribui a instância local à variável global (necessário para sendChatMessage/disconnect)
+    stompClient = clientInstance;
+
+    clientInstance.connect({}, (frame) => {
+        // O cliente está conectado.
         console.log('Conectado ao WebSocket:', frame);
 
-        // 🔑 Assina o tópico do BROKER para o grupo específico: /topic/group/{groupId}
-        stompClient.subscribe(`/topic/group/${groupId}`, (message) => {
+        if (onConnectStatusChange) onConnectStatusChange(true);
+
+        // 🔑 CORREÇÃO CRÍTICA: Usa a instância LOCAL (clientInstance) para a inscrição.
+        // Isso impede que a limpeza de um grupo antigo interfira na inscrição do grupo novo.
+        clientInstance.subscribe(`/topic/group/${groupId}`, (message) => {
             const newMessage = JSON.parse(message.body);
 
             // Mapeia e envia para o componente React
@@ -69,6 +75,7 @@ export const connectAndSubscribe = (groupId, onMessageReceived) => {
         });
     }, (error) => {
         console.error('Erro STOMP/WebSocket:', error);
+        if (onConnectStatusChange) onConnectStatusChange(false);
     });
 };
 
@@ -91,12 +98,18 @@ export const sendChatMessage = (groupId, content) => {
 
 /**
  * 4. Desconecta o WebSocket
+ * 🔑 ALTERADO: Aceita um callback para notificar a desconexão.
  */
-export const disconnect = () => {
+export const disconnect = (onDisconnect = () => {}) => {
+    // A variável global stompClient é usada aqui para fechar a conexão ativa
     if (stompClient && stompClient.connected) {
         stompClient.disconnect(() => {
             console.log("Desconectado do WebSocket.");
             stompClient = null;
+            onDisconnect();
         });
+    } else {
+        stompClient = null;
+        onDisconnect();
     }
 };

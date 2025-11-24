@@ -3,15 +3,19 @@ package community_health.com.communityHealth.group.controller;
 import community_health.com.communityHealth.group.dto.RankingDto;
 import community_health.com.communityHealth.group.model.Group;
 import community_health.com.communityHealth.group.service.GroupService;
-import community_health.com.communityHealth.utils.FileUploadUtil; // 🔑 Importar o utilitário
+import community_health.com.communityHealth.utils.FileUploadUtil;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile; // 🔑 Importar para lidar com o upload
+import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.List;
+
+// 🔑 NOVO: DTO simples para receber a URL do JSON (necessário para PUT/PATCH)
+record ImageUpdateDto(String imageUrl) {}
+
 
 @RestController
 @RequestMapping("/api/groups")
@@ -40,6 +44,28 @@ public class GroupController {
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST); // Retorna 400 Bad Request
         }
     }
+
+    /**
+     * 🆕 NOVO ENDPOINT: Atualiza a URL da imagem de um grupo existente.
+     * Mapeado para: PUT /api/groups/{groupId}/image
+     */
+    @PutMapping("/{groupId}/image")
+    public ResponseEntity<Group> updateGroupImage(
+            @PathVariable Long groupId,
+            @RequestBody ImageUpdateDto imageUpdateDto) { // Recebe o DTO com a nova URL
+        try {
+            // Chama o serviço para atualizar a URL (o GroupService deve conter a lógica de salvar)
+            Group updatedGroup = groupService.updateImageUrl(groupId, imageUpdateDto.imageUrl());
+            return ResponseEntity.ok(updatedGroup); // Retorna 200 OK com o grupo atualizado
+        } catch (EntityNotFoundException e) {
+            // Se o grupo não for encontrado, retorna 404
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            System.err.println("Erro ao atualizar foto do grupo: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
 
     /**
      * 🆕 NOVO ENDPOINT: Faz o upload da imagem do grupo e retorna a URL pública.

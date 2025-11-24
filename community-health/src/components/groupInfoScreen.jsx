@@ -12,6 +12,17 @@ const GroupInfoScreen = ({ group, onBack }) => {
   const [loadingRanking, setLoadingRanking] = useState(true);
   const [groupStats, setGroupStats] = useState({}); // Para dados de Estatísticas
 
+  // 🔑 DESESTRUTURAÇÃO: Obtendo dados do progresso calculados no App.jsx
+  const {
+    name,
+    daysRemaining,
+    // 🔑 CAMPOS DINÂMICOS PASSADOS VIA PROP
+    progressPercent,
+    startDate, // Já é a string formatada 'dd/mm'
+    endDate    // Já é a string formatada 'dd/mm'
+  } = group;
+
+
   // -------------------------------------------------------------
   // LÓGICA DE CARREGAMENTO DE DADOS
   // -------------------------------------------------------------
@@ -60,21 +71,8 @@ const GroupInfoScreen = ({ group, onBack }) => {
   };
 
 
-  // calcular progresso (dias passados / total de dias) - Lógica mantida
-  const totalDays = group.durationDays || 30; // Usa a duração real do grupo
-  const daysElapsed = totalDays - group.daysRemaining;
-  const progress = (daysElapsed / totalDays) * 100;
-
-  // datas de inicio e fim - Lógica mantida
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - daysElapsed);
-  const endDate = new Date();
-  endDate.setDate(endDate.getDate() + group.daysRemaining);
-
-  const formatDate = (date) => {
-    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-  };
-
+  // 🛑 REMOVIDO: cálculos de progresso (totalDays, daysElapsed, progress, startDate, endDate, formatDate)
+  // ESTAMOS USANDO group.progressPercent, group.startDate, group.endDate
 
   // -------------------------------------------------------------
   // COMPONENTE DE CLASSIFICAÇÃO (Lista de Membros Ativos)
@@ -205,25 +203,28 @@ const GroupInfoScreen = ({ group, onBack }) => {
           <ArrowLeft className="w-5 h-5 text-gray-600" />
         </button>
         <h1 className="text-3xl font-['Shantell_Sans'] font-semibold text-[#212121] mb-6">
-          {group.name}
+          {name}
         </h1>
 
-        {/* barra de progresso */}
+        {/* barra de progresso DINÂMICA (usando props) */}
         <div className="mb-6">
           <div className="flex justify-between text-sm text-[#212121] mb-2 font-['Shanti']">
             <div>
               <span className="font-semibold">Iniciado: </span>
-              <span className="text-gray-500">{formatDate(startDate)}</span>
+              {/* 🔑 Usando o startDate formatado do App.jsx */}
+              <span className="text-gray-500">{startDate}</span>
             </div>
             <div>
               <span className="font-semibold">Termina: </span>
-              <span className="text-gray-500">{formatDate(endDate)}</span>
+              {/* 🔑 Usando o endDate formatado do App.jsx */}
+              <span className="text-gray-500">{endDate}</span>
             </div>
           </div>
           <div className="w-full bg-white rounded-full h-4">
             <div
               className="bg-[#2E67D3] h-4 rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
+              // 🔑 Usando o progressPercent calculado do App.jsx
+              style={{ width: `${progressPercent}%` }}
             />
           </div>
         </div>

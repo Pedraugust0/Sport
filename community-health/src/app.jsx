@@ -5,14 +5,43 @@ import ActivityFeed from './components/activityFeed';
 import FloatingButton from './components/floatingButton';
 import CheckinModal from './components/checkinModal';
 import CheckinDetailModal from './components/checkinDetailModal';
-import GroupInfoScreen from './components/groupInfoScreen';
+import GroupInfoScreen from './components/groupInfoScreen'; // Mantido GroupInfoScreen para a barra
 import CreateGroupModal from './components/createGroupModal';
 import ChatScreen from './components/chatScreen';
 // 🔑 Importe as funções de API (INCLUINDO uploadImage e updateGroupImageUrl)
 import { createGroup, getAllGroups, createCheckin, getCheckinsByGroupId, createComment, uploadImage, updateGroupImageUrl, uploadCheckinImage } from './services/groupService'; // ⬅️ Adicionei uploadCheckinImage
 
 // Importações locais (imagens)
+// ⚠️ ATENÇÃO: Verifique se o caminho './imagens/Davi.jpeg' está correto no app.jsx
 import daviPhoto from './imagens/Davi.jpeg';
+
+// 🔑 FUNÇÃO AUXILIAR: Calcula o progresso do desafio em porcentagem
+const calculateProgress = (group) => {
+    // group.startDate é uma string ISO do backend
+    if (!group.startDate || !group.durationDays || group.durationDays <= 0) {
+        return 0;
+    }
+
+    const startDate = new Date(group.startDate);
+
+    // Calcula a data final: Data de Início + Duração em dias
+    const endDate = new Date(startDate.getTime() + group.durationDays * 24 * 60 * 60 * 1000);
+
+    const today = new Date();
+
+    // Calcula a diferença em milissegundos
+    const totalDurationMs = endDate.getTime() - startDate.getTime();
+    const elapsedDurationMs = today.getTime() - startDate.getTime();
+
+    // Se o evento ainda não começou ou já terminou
+    if (elapsedDurationMs < 0) return 0;
+    if (elapsedDurationMs >= totalDurationMs) return 100;
+
+    // Calcula e limita a porcentagem entre 0 e 100
+    const progress = (elapsedDurationMs / totalDurationMs) * 100;
+    // Arredonda para 1 casa decimal
+    return Math.min(100, Math.max(0, parseFloat(progress.toFixed(1))));
+};
 
 function App() {
 
@@ -29,7 +58,7 @@ function App() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [isCreateGroupModalOpen, setIsCreateGroupModalOpen] = useState(false);
-  const [showChat, setShowChat] = useState(false);
+  const [showChat, setShowChat] = useState(false); // Estado de controle de chat
 
   // -------------------------------------------------------------
   // 🆕 FUNÇÃO AUXILIAR: Mapeia dados da API (Checkin Java) para a UI (ActivityFeed React)
@@ -49,6 +78,7 @@ function App() {
         photo: apiCheckin.photoUrl || null,
         metrics: {
             distance: apiCheckin.metricas.distanciaKm > 0 ? `${apiCheckin.metricas.distanciaKm} km` : null,
+            // 🛑 CORRIGIDO: O nome da variável estava 'apiAcheckin' causando o ReferenceError
             duration: apiCheckin.metricas.duracaoMin > 0 ? `${apiCheckin.metricas.duracaoMin} min` : null,
             steps: apiCheckin.metricas.passos > 0 ? `${apiCheckin.metricas.passos} passos` : null,
         },
@@ -74,6 +104,16 @@ function App() {
           const firstGroup = fetchedGroups[0];
           setCurrentGroup(firstGroup);
 
+          // 🔑 NOVO: Calcula o progresso inicial
+          const progressPercent = calculateProgress(firstGroup);
+
+          // Converte a string de data (firstGroup.startDate) para um objeto Date
+          const apiStartDateObject = firstGroup.startDate ? new Date(firstGroup.startDate) : null;
+
+          const endDate = apiStartDateObject && firstGroup.durationDays
+                ? new Date(apiStartDateObject.getTime() + firstGroup.durationDays * 24 * 60 * 60 * 1000)
+                : null;
+
           // Mapeia o objeto API para o formato detalhado do seu componente
           setCurrentGroupData({
             id: firstGroup.id,
@@ -84,6 +124,11 @@ function App() {
             leader: { name: 'Líder', checkins: 0 },
             description: firstGroup.description,
             isPrivate: firstGroup.isPrivate,
+
+            // 🔑 CAMPOS ADICIONADOS PARA PROGRESSO
+            progressPercent: progressPercent,
+            startDate: apiStartDateObject ? apiStartDateObject.toLocaleDateString('pt-BR') : 'N/D',
+            endDate: endDate ? endDate.toLocaleDateString('pt-BR') : 'N/D',
           });
 
           // 🚀 CHAMA A BUSCA DE CHECK-INS APÓS CARREGAR O PRIMEIRO GRUPO
@@ -151,8 +196,19 @@ function App() {
     setIsDetailModalOpen(true);
   };
 
+  // 🔑 FUNÇÃO ALTERADA: Reseta a visualização ao trocar de grupo
   const handleGroupChange = (group) => {
     setCurrentGroup(group);
+
+    // 🔑 NOVO: Calcula o progresso ao trocar de grupo
+    const progressPercent = calculateProgress(group);
+
+    // Converte a string de data (group.startDate) para um objeto Date
+    const apiStartDateObject = group.startDate ? new Date(group.startDate) : null;
+
+    const endDate = apiStartDateObject && group.durationDays
+        ? new Date(apiStartDateObject.getTime() + group.durationDays * 24 * 60 * 60 * 1000)
+        : null;
 
     // Mapeamento de Group da API para GroupData para UI
     const groupData = {
@@ -164,8 +220,17 @@ function App() {
         leader: { name: 'Davi de Souza', checkins: 0 },
         description: group.description || '',
         isPrivate: group.isPrivate || false,
+
+        // 🔑 CAMPOS ADICIONADOS PARA PROGRESSO
+        progressPercent: progressPercent,
+        startDate: apiStartDateObject ? apiStartDateObject.toLocaleDateString('pt-BR') : 'N/D',
+        endDate: endDate ? endDate.toLocaleDateString('pt-BR') : 'N/D',
     };
     setCurrentGroupData(groupData);
+
+    // 🛑 ESSENCIAL: Zera o estado de navegação para retornar ao Hub/Feed
+    setShowChat(false);
+    setShowGroupInfo(false);
 
     // 🚀 CHAMA A BUSCA DE CHECK-INS AO TROCAR DE GRUPO
     loadCheckins(group.id);
@@ -232,6 +297,18 @@ function App() {
          // Adiciona o novo grupo retornado pela API à lista
          setGroups(prevGroups => [...prevGroups, newGroupFromApi]);
 
+         // 🔑 CHAVE DA CORREÇÃO: Converte a string de data (newGroupFromApi.startDate) para um objeto Date
+         const apiStartDateObject = newGroupFromApi.startDate ? new Date(newGroupFromApi.startDate) : null;
+
+         // 🔑 NOVO: Calcula o progresso para o novo grupo
+         const progressPercent = calculateProgress(newGroupFromApi);
+
+         const endDate = apiStartDateObject && newGroupFromApi.durationDays
+              // 🛑 CORRIGIDO: Usa .getTime() na variável apiStartDateObject (objeto Date)
+              ? new Date(apiStartDateObject.getTime() + newGroupFromApi.durationDays * 24 * 60 * 60 * 1000)
+              : null;
+
+
          // Mapeia o objeto API para o formato detalhado do seu componente
          const newGroupData = {
            id: newGroupFromApi.id,
@@ -244,6 +321,12 @@ function App() {
            leader: { name: newGroupFromApi.owner?.name || 'salada de fruta', checkins: 0 },
            description: newGroupFromApi.description,
            isPrivate: newGroupFromApi.isPrivate,
+
+           // 🔑 CAMPOS ADICIONADOS PARA PROGRESSO
+           progressPercent: progressPercent,
+           // 🛑 CORRIGIDO: Usa o objeto Date (apiStartDateObject) para formatar
+           startDate: apiStartDateObject ? apiStartDateObject.toLocaleDateString('pt-BR') : 'N/D',
+           endDate: endDate ? endDate.toLocaleDateString('pt-BR') : 'N/D',
          };
 
          // Atualiza o estado da aplicação para o novo grupo
@@ -252,6 +335,10 @@ function App() {
 
          // Limpa e recarrega as atividades (que será uma lista vazia para o novo grupo)
          setActivities([]);
+
+         // Garante que o usuário veja o Hub após criar
+         setShowChat(false);
+         setShowGroupInfo(false);
 
          setIsCreateGroupModalOpen(false); // Fecha o modal
      } catch (error) {

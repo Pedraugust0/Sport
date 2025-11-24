@@ -15,14 +15,15 @@ const CURRENT_USER_NAME = 'Davi de Souza'; // Assumindo que o ID 1 é Davi
 const CURRENT_USER_PHOTO = daviPhoto; // Foto do usuário logado
 
 const ChatScreen = ({ group, onBack }) => {
-  // group: { id, name, ... } - O ID é crucial
   const [message, setMessage] = useState('');
-  // 🔑 Removemos os mocks e inicializamos as mensagens como uma lista vazia
   const [messages, setMessages] = useState([]);
   const messagesEndRef = useRef(null);
 
   // 🆕 Estado para feedback visual
   const [loadingHistory, setLoadingHistory] = useState(true);
+
+  // 🔑 NOVO ESTADO: Rastrea se o WebSocket está pronto para envio
+  const [isConnected, setIsConnected] = useState(false);
 
   // --- Funções Auxiliares ---
 
@@ -68,16 +69,18 @@ const ChatScreen = ({ group, onBack }) => {
     const groupId = group.id;
     if (!groupId) return;
 
+    // Limpeza de estado e status ao trocar de grupo
+    setMessages([]);
+    setIsConnected(false); // Garante que o input/botão fiquem desabilitados imediatamente
+    setLoadingHistory(true);
+
     // 1. Carrega Histórico via HTTP (REST)
     const loadHistory = async () => {
-      setLoadingHistory(true);
       try {
         const history = await getChatHistory(groupId);
-        // 🔑 Substitui os mocks pelo histórico mapeado
         setMessages(history.map(mapApiMessageToUI));
       } catch (error) {
         console.error("Falha ao carregar o histórico de chat:", error);
-        // Opcional: Mostrar um erro na UI
       } finally {
         setLoadingHistory(false);
       }
@@ -85,11 +88,17 @@ const ChatScreen = ({ group, onBack }) => {
 
     // 2. Conecta ao WebSocket e Assina o Tópico
     loadHistory();
-    connectAndSubscribe(groupId, handleNewMessage);
+    // 🔑 Passa o novo callback para atualizar o estado isConnected
+    connectAndSubscribe(
+        groupId,
+        handleNewMessage,
+        (status) => setIsConnected(status) // Recebe true/false do chatService
+    );
 
-    // 3. CLEANUP: Desconexão do WebSocket quando o componente for desmontado
+    // 3. CLEANUP: Desconexão do WebSocket
     return () => {
-      disconnect();
+      // 🔑 Chama disconnect e usa o callback para setar isConnected = false
+      disconnect(() => setIsConnected(false));
     };
   }, [group.id, mapApiMessageToUI, handleNewMessage]);
 
@@ -102,17 +111,16 @@ const ChatScreen = ({ group, onBack }) => {
   const handleSendMessage = (e) => {
     e.preventDefault();
     const content = message.trim();
-    if (!content) return;
 
-    // 🔑 MUDANÇA: Agora, apenas enviamos o conteúdo para o STOMP SEND
-    // O backend (ChatController) cuida de:
-    // 1. Obter o sender (ID 1)
-    // 2. Salvar no banco
-    // 3. Enviar para o tópico
+    // 🔑 CHECAGEM CRÍTICA: Se o botão está desabilitado, essa função NÃO DEVERIA ser chamada.
+    // Mas, como segurança: se não está conectado, apenas retorna,
+    // confiando que a desabilitação na UI já impede a maioria dos cliques.
+    if (!content || !isConnected) {
+        // 🔑 REMOÇÃO DO CONSOLE.WARN: Remove a mensagem de erro para o usuário
+        return;
+    }
+
     sendChatMessage(group.id, content);
-
-    // O WebSocket (via handleNewMessage) irá adicionar a mensagem à lista
-    // após ela ter sido processada e retornada pelo servidor.
     setMessage('');
   };
 
@@ -129,12 +137,16 @@ const ChatScreen = ({ group, onBack }) => {
         <h2 className="text-xl font-bold text-gray-800">{group?.name || "Chat do Grupo"}</h2>
       </div>
 
-      {loadingHistory && (
+      {/* 🔑 Feedback visual unificado: Carregando Histórico ou Conectando */}
+      {(loadingHistory || !isConnected) && (
         <div className="flex justify-center items-center flex-1">
-          <p className="text-gray-500">Carregando histórico...</p>
+          <p className="text-gray-500">
+            {loadingHistory ? "Carregando histórico..." : "Conectando ao chat..."}
+          </p>
         </div>
       )}
 
+      {/* 🔑 Renderiza as mensagens SOMENTE se o histórico tiver carregado */}
       {!loadingHistory && (
         <div className="flex-1 overflow-y-auto space-y-4 mb-6">
           {messages.map((msg) => (
@@ -186,14 +198,18 @@ const ChatScreen = ({ group, onBack }) => {
             type="text"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder="Adicione um comentário..."
-            className="flex-1 px-4 py-2 border rounded-full focus:outline-none focus:ring-2 transition-all"
-            style={{ borderColor: '#EDEDED', backgroundColor: '#FFFFFF' }}
-            disabled={loadingHistory}
+            // 🔑 UX: Muda o placeholder para indicar o estado
+            placeholder={isConnected ? "Adicione um comentário..." : "Conectando... Aguarde."}
+            // 🔑 UX: Adiciona um estilo visual para disabled (bg-gray-200)
+            className={`flex-1 px-4 py-2 border rounded-full focus:outline-none focus:ring-2 transition-all ${!isConnected ? 'bg-gray-200 cursor-wait' : ''}`}
+            style={{ borderColor: '#EDEDED' }}
+            // 🔑 Desabilita a digitação se não estiver conectado
+            disabled={!isConnected}
           />
           <button
             type="submit"
-            disabled={!message.trim() || loadingHistory}
+            // 🔑 Desabilita se não tiver mensagem OU se não estiver conectado
+            disabled={!message.trim() || !isConnected}
             className="px-6 py-2 text-white rounded-full font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ background: '#2E67D3' }}
           >
