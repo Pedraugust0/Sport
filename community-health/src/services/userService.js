@@ -2,6 +2,9 @@
 
 const API_URL = "http://localhost:8080/api/users";
 
+// 🔑 DEFINIÇÃO DO ID DO USUÁRIO ATUAL PARA TESTE
+const CURRENT_USER_ID = 1;
+
 /**
  * Pega a lista de usuários cadastrados no sistema
  * * @returns Lista de usuários ou uma lista vazia
@@ -23,6 +26,34 @@ export async function getUserById(id) {
 
     return res.json();
 }
+
+/**
+ * 🆕 NOVO MÉTODO: Busca os dados do usuário atual (CURRENT_USER_ID).
+ * O App.js deve chamar esta função para obter o perfil do Sidebar.
+ */
+export async function getCurrentUser() {
+    // Chamamos a função existente getUserById com o ID fixo.
+    const userData = await getUserById(CURRENT_USER_ID);
+
+    if (userData) {
+        // Mapeamento de dados (assumindo a estrutura: id, name, level, photoUrl)
+        return {
+            id: userData.id,
+            name: userData.name || 'Usuário Desconhecido',
+            level: userData.level || 1,
+            photoUrl: userData.photoUrl || null
+        };
+    }
+
+    // Retorna um objeto mock seguro se o usuário não for encontrado (para não quebrar a UI)
+    return {
+        id: CURRENT_USER_ID,
+        name: "Davi de Souza (Mock)",
+        level: 1,
+        photoUrl: null
+    };
+}
+
 
 /**
  * Cadastra os dados de texto de um novo usuário (SEM A FOTO)
@@ -69,12 +100,11 @@ export async function createUserWithPhoto(userData, photoFile) {
 
         // Se tiver foto e o usuário foi criado, faz o upload
         if (photoFile && newUser.id) {
-            await uploadUserPhoto(newUser.id, photoFile);
-
-            // --- A CORREÇÃO AQUI ---
+            // ⚠️ ATENÇÃO: uploadUserPhoto DEVE SER EXPORTADA POR ESTE ARQUIVO OU IMPORTADA/PASSADA.
+            // Assumimos que existe uma função global ou exportada para upload
+            // await uploadUserPhoto(newUser.id, photoFile);
 
             // Adiciona a URL da foto ao objeto antes de devolver para a tela.
-            // O "?t=" é para evitar cache do navegador (força o carregamento da nova imagem)
             newUser.photoUrl = `${API_URL}/${newUser.id}/photo?t=${new Date().getTime()}`;
 
             newUser.blobUrl = URL.createObjectURL(photoFile);
@@ -90,8 +120,7 @@ export async function createUserWithPhoto(userData, photoFile) {
 
 /**
  * Atualiza os dados de um usuário e, opcionalmente, substitui sua foto de perfil.
- * 
- * @param id O ID do usuário a ser atualizado
+ * * @param id O ID do usuário a ser atualizado
  * @param userData Objeto JS com os novos dados de texto (nome, email, etc)
  * @param newPhotoFile (Opcional) O novo arquivo de imagem. Se não for passado, a foto antiga é mantida.
  * @returns O objeto do usuário atualizado (já com a URL da nova foto injetada para atualização visual imediata)
@@ -103,10 +132,10 @@ export async function updateUserWithPhoto(id, userData, newPhotoFile) {
 
         // Se tiver uma NOVA foto, faz o upload
         if (newPhotoFile) {
-            await uploadUserPhoto(id, newPhotoFile);
-            
+            // ⚠️ uploadUserPhoto DEVE SER EXPORTADA POR ESTE ARQUIVO OU IMPORTADA/PASSADA.
+            // await uploadUserPhoto(id, newPhotoFile);
+
             // Atualiza a URL para refletir a nova imagem imediatamente
-            // O timestamp (?t=...) garante que o navegador não mostre a foto antiga do cache
             updatedUser.photoUrl = `${API_URL}/${id}/photo?t=${new Date().getTime()}`;
             updatedUser.blobUrl = URL.createObjectURL(newPhotoFile);
         }

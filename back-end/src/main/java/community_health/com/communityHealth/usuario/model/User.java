@@ -1,15 +1,19 @@
 package community_health.com.communityHealth.usuario.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import community_health.com.communityHealth.group.model.GroupMember;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.*; // Importa todas as anotações do Lombok
 import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
 @Table(name = "Users")
-@NoArgsConstructor
+@Getter // 🔑 Implementa todos os getters automaticamente
+@Setter // 🔑 Implementa todos os setters automaticamente
+@NoArgsConstructor // Implementa o construtor sem argumentos
+@AllArgsConstructor // Implementa um construtor com todos os argumentos
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
@@ -34,8 +38,15 @@ public class User {
     private LocalDateTime createdAt;
 
     // Relacionamentos inversos (opcional, mas útil para queries)
+    // 🔑 MANTIDO: O @JsonIgnore é crucial para evitar o LazyInitializationException
+    // quando o Jackson tenta serializar o GroupMessage.
+    @JsonIgnore
     @OneToMany(mappedBy = "user")
     private List<GroupMember> memberships;
+
+    /*
+    // 🔑 REMOÇÃO: Os construtores manuais abaixo são agora cobertos por @NoArgsConstructor e @AllArgsConstructor
+    // Se você precisar de um construtor específico, use @RequiredArgsConstructor ou @AllArgsConstructor(onlyExplicitlyIncluded = true)
 
     public User(String name, String email, String passwordHash, Integer level, LocalDateTime createdAt) {
         this.name = name;
@@ -54,64 +65,6 @@ public class User {
         this.memberships = memberships;
     }
 
-    public Long getId() {
-        return id;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public String getPasswordHash() {
-        return passwordHash;
-    }
-
-    public void setPasswordHash(String passwordHash) {
-        this.passwordHash = passwordHash;
-    }
-
-    public String getPhotoUrl() {
-        return photoUrl;
-    }
-
-    public void setPhotoUrl(String photoUrl) {
-        this.photoUrl = photoUrl;
-    }
-
-    public Integer getLevel() {
-        return level;
-    }
-
-    public void setLevel(Integer level) {
-        this.level = level;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public List<GroupMember> getMemberships() {
-        return memberships;
-    }
-
-    public void setMemberships(List<GroupMember> memberships) {
-        this.memberships = memberships;
-    }
-
+    // 🔑 REMOÇÃO: Todos os Getters e Setters manuais foram removidos.
+    */
 }

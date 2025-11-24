@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 import jakarta.transaction.Transactional;
 import jakarta.persistence.EntityNotFoundException;
-import java.util.UUID;
+
 import java.util.List;
 
 @Service
@@ -29,7 +29,7 @@ public class CheckinService {
 
     // Método para salvar um novo Check-in (RECEBENDO userId)
     @Transactional
-    public Checkin createCheckin(Checkin checkin, UUID groupId, Long userId) { // 🆕 userId ADICIONADO
+    public Checkin createCheckin(Checkin checkin, Long groupId, Long userId) { // 🆕 userId ADICIONADO
 
         // 1. Validar e carregar o Group
         Group group = groupRepository.findById(groupId)
@@ -52,7 +52,7 @@ public class CheckinService {
     }
 
     // Método para buscar Check-ins por Grupo
-    public List<Checkin> getCheckinsByGroupId(UUID groupId) {
+    public List<Checkin> getCheckinsByGroupId(Long groupId) {
         return checkinRepository.findByGroupId(groupId);
     }
 

@@ -1,17 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // 🔑 Importar useEffect
 import { X, ArrowLeft, Upload } from 'lucide-react';
 
-const CheckinModal = ({ isOpen, onClose, onSubmit }) => {
-  const [formData, setFormData] = useState({
+// 🔑 Estado inicial definido fora do componente para fácil reset
+const INITIAL_FORM_DATA = {
     title: '',
     description: '',
     photo: null,
     distance: '',
     duration: '',
     steps: '',
-  });
+};
 
+const CheckinModal = ({ isOpen, onClose, onSubmit }) => {
+  const [formData, setFormData] = useState(INITIAL_FORM_DATA);
   const [photoPreview, setPhotoPreview] = useState(null);
+
+  // 🔑 FUNÇÃO DE RESET
+  const resetForm = () => {
+    setFormData(INITIAL_FORM_DATA);
+    setPhotoPreview(null);
+  };
+
+  // 🚀 NOVO: Reseta o estado sempre que o modal for aberto
+  useEffect(() => {
+    if (isOpen) {
+      resetForm();
+    }
+  }, [isOpen]); // Depende apenas da mudança da prop isOpen
+
+  // 🔑 FUNÇÃO UNIFICADA DE CANCELAMENTO E FECHAMENTO
+  const handleCancel = () => {
+    resetForm();
+    onClose();
+  }
 
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
@@ -25,20 +46,21 @@ const CheckinModal = ({ isOpen, onClose, onSubmit }) => {
     }
   };
 
+  // 🔑 ATUALIZADO: Extrai o objeto File e o passa como segundo argumento para o onSubmit
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit(formData);
-    // reset form
-    setFormData({
-      title: '',
-      description: '',
-      photo: null,
-      distance: '',
-      duration: '',
-      steps: '',
-    });
-    setPhotoPreview(null);
-    onClose();
+
+    // 1. Extrai o File object do formData
+    const photoFile = formData.photo;
+
+    // 2. Cria um novo objeto de dados sem o File object (para limpar o JSON)
+    const { photo, ...dataToSend } = formData;
+
+    // 3. CHAMA O HANDLER EXTERNO
+    onSubmit(dataToSend, photoFile);
+
+    // 4. Resetar e Fechar usando o handler unificado
+    handleCancel();
   };
 
   if (!isOpen) return null;
@@ -49,7 +71,8 @@ const CheckinModal = ({ isOpen, onClose, onSubmit }) => {
         {/* Header */}
         <div className="sticky top-0 p-6 rounded-t-3xl flex items-center" style={{ background: '#EDEDED' }}>
           <button
-            onClick={onClose}
+            // 🔑 LIGA AO HANDLER DE CANCELAMENTO
+            onClick={handleCancel}
             className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
           >
             <ArrowLeft className="w-5 h-5 text-gray-600" />
@@ -169,7 +192,8 @@ const CheckinModal = ({ isOpen, onClose, onSubmit }) => {
           <div className="flex gap-3 pt-4">
             <button
               type="button"
-              onClick={onClose}
+              // 🔑 LIGA AO HANDLER DE CANCELAMENTO E RESET
+              onClick={handleCancel}
               className="px-4 py-2 border border-gray-300 text-gray-700 rounded-full text-sm font-medium hover:bg-gray-50 transition-colors font-['Shanti']"
             >
               Cancelar

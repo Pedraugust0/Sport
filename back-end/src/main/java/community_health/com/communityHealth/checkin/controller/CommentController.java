@@ -58,4 +58,26 @@ public class CommentController {
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
+
+    /**
+     * 🆕 NOVO ENDPOINT: Remove uma reação específica de um Check-in.
+     * URL: DELETE /api/comments?checkinId={ID}&userId={ID}&emoji={EMOJI}
+     */
+    @DeleteMapping
+    public ResponseEntity<Object> removeReaction(
+            @RequestParam Long checkinId,
+            @RequestParam(defaultValue = "1") Long userId, // Assume userId=1 por padrão (teste)
+            @RequestParam String emoji) {
+        try {
+            commentService.removeReaction(checkinId, userId, emoji);
+            // Retorna 204 No Content para remoção bem-sucedida (sem corpo de resposta)
+            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+        } catch (EntityNotFoundException e) {
+            // Se a reação não existir para ser removida, retorna 404
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.NOT_FOUND);
+        } catch (Exception e) {
+            System.err.println("Erro ao remover reação: " + e.getMessage());
+            return new ResponseEntity<>("Erro interno ao remover reação.", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
 }

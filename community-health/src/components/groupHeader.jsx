@@ -1,27 +1,42 @@
-import React, { useState } from 'react';
+import React, { useState } from 'react'; // Mantemos useState para o estado do File
 import { Calendar, Camera } from 'lucide-react';
 import daviPhoto from '../imagens/Davi.jpeg';
 
+// Assumindo que o App.js já passou a prop onImageChange (que lida com o upload)
 const GroupHeader = ({ group, onShowInfo, onImageChange }) => {
-  const [groupImage, setGroupImage] = useState(group.image);
+  // 🔑 Removido useState(groupImage) e useEffect para evitar dessincronização
 
-  React.useEffect(() => {
-    setGroupImage(group.image);
-  }, [group.id, group.image]);
+  // A URL ativa é sempre o valor da prop group.image (que o App.js atualiza após o upload)
+  const imageUrl = group.image;
 
+  // 🔑 ATUALIZADO: Captura o objeto File e chama o handler do App.js
   const handleImageChange = (e) => {
+    // Para evitar que o clique na label acione o onShowInfo
+    e.stopPropagation();
     const file = e.target.files[0];
+
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setGroupImage(reader.result);
-        if (onImageChange) {
-          onImageChange(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
+      // O App.js fará o upload real e a atualização do estado global.
+      if (onImageChange) {
+        // 🔑 CHAMA O HANDLER EXTERNO: Passa o objeto File real para o App.js
+        onImageChange(file);
+      }
     }
   };
+
+  // --- Mocks e Cálculos (Mantidos) ---
+  const totalDays = group.durationDays || 30; // duracao total do desafio
+  const daysElapsed = totalDays - group.daysRemaining;
+  const progress = (daysElapsed / totalDays) * 100;
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - daysElapsed);
+  const endDate = new Date();
+  endDate.setDate(endDate.getDate() + group.daysRemaining);
+
+  const formatDate = (date) => {
+    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  };
+  // --- Fim Mocks ---
 
   return (
     <div className="mb-6 flex flex-col items-center">
@@ -29,14 +44,14 @@ const GroupHeader = ({ group, onShowInfo, onImageChange }) => {
         {group.name}
       </h1>
 
-      <div 
+      <div
         onClick={onShowInfo}
         className="bg-white rounded-xl overflow-hidden w-full max-w-3xl transition-all duration-300 hover:scale-[1.02] cursor-pointer relative"
       >
         <div className="relative w-full h-48 group/image">
-          {groupImage ? (
-            <img 
-              src={groupImage} 
+          {imageUrl ? (
+            <img // 🔑 Usa a prop group.image (que já será a URL do backend ou o Base64 temporário)
+              src={imageUrl}
               alt={group.name}
               className="w-full h-full object-cover"
             />
@@ -45,8 +60,8 @@ const GroupHeader = ({ group, onShowInfo, onImageChange }) => {
               <span className="text-7xl">🏃</span>
             </div>
           )}
-          
-          <label 
+
+          <label
             htmlFor="group-image-upload"
             onClick={(e) => e.stopPropagation()}
             className="absolute bottom-3 right-3 bg-white rounded-full p-2 shadow-lg cursor-pointer hover:bg-gray-100 transition-colors opacity-0 group-hover/image:opacity-100"
@@ -56,7 +71,7 @@ const GroupHeader = ({ group, onShowInfo, onImageChange }) => {
               id="group-image-upload"
               type="file"
               accept="image/*"
-              onChange={handleImageChange}
+              onChange={handleImageChange} // 🔑 Chama o novo handler que passa o File
               className="hidden"
             />
           </label>

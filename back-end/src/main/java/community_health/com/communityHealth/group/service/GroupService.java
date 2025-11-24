@@ -1,27 +1,32 @@
 package community_health.com.communityHealth.group.service;
 
+import community_health.com.communityHealth.checkin.repository.CheckinRepository;
+import community_health.com.communityHealth.group.dto.RankingDto;
 import community_health.com.communityHealth.group.model.Group;
 import community_health.com.communityHealth.group.repository.GroupRepository;
 import community_health.com.communityHealth.usuario.model.User;
 import community_health.com.communityHealth.usuario.service.UserService; // Assumindo que você tem um UserService
+import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import jakarta.persistence.EntityNotFoundException;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
+
 
 @Service
 public class GroupService {
 
     private final GroupRepository groupRepository;
     private final UserService userService; // Para buscar o Owner
+    private final CheckinRepository checkinRepository;
 
     @Autowired
-    public GroupService(GroupRepository groupRepository, UserService userService) {
+    public GroupService(GroupRepository groupRepository, UserService userService, CheckinRepository checkinRepository) {
         this.groupRepository = groupRepository;
         this.userService = userService;
+        this.checkinRepository = checkinRepository;
     }
 
     /**
@@ -56,5 +61,21 @@ public class GroupService {
         return groupRepository.findAll();
     }
 
-    // ... Adicione métodos para atualizar, deletar e outras regras de negócio
+    public List<RankingDto> getGroupRanking(Long groupId) {
+        // A query em CheckinRepository já filtra por grupo e calcula as métricas.
+        return checkinRepository.findRankingByGroupId(groupId);
+    }
+
+    /**
+     * 🆕 NOVO MÉTODO: Atualiza apenas a URL da imagem do grupo no banco de dados.
+     */
+    @Transactional
+    public Group updateImageUrl(Long groupId, String imageUrl) {
+        return groupRepository.findById(groupId)
+                .map(group -> {
+                    group.setImageUrl(imageUrl);
+                    return groupRepository.save(group);
+                })
+                .orElseThrow(() -> new EntityNotFoundException("Grupo não encontrado com ID: " + groupId));
+    }
 }

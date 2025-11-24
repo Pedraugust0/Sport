@@ -1,20 +1,36 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, MessageCircle, Smile, Clock, MapPin, Footprints } from 'lucide-react';
-// 🔑 Importar a função de busca para carregar dados existentes
-import { getCommentsByCheckinId } from '../services/groupService';
+import React, { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, Smile, Clock, MapPin, Footprints } from 'lucide-react';
+import { createComment, getCommentsByCheckinId, removeReaction } from '../services/groupService';
 
 import daviPhoto from '../imagens/Davi.jpeg';
 
-// Recebe as props de API: onCreateComment (envio)
-const CheckinDetailModal = ({ isOpen, onClose, checkin, onCreateComment }) => { // 🔑 Recebe onCreateComment
+const CheckinDetailModal = ({ isOpen, onClose, checkin, onCreateComment }) => {
 
-  const [commentText, setCommentText] = useState(''); // Renomeado para evitar conflito com 'comment' da prop
+  const [commentText, setCommentText] = useState('');
   const [comments, setComments] = useState([]);
-  const [reactions, setReactions] = useState({}); // Estado das reações vindas do backend
+  const [reactions, setReactions] = useState({});
+  const [currentUserReactions, setCurrentUserReactions] = useState(new Set());
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [loadingComments, setLoadingComments] = useState(false); // Novo estado de carregamento
+  const [loadingComments, setLoadingComments] = useState(false);
+
+  // DECLARAÇÃO CORRETA: Uma única vez no topo do componente
+  const commentsEndRef = useRef(null);
 
   const availableEmojis = ['❤️', '💪', '🔥', '👏', '👍'];
+  const CURRENT_USER_MOCK_ID = 1;
+
+  const totalReactions = Object.values(reactions).reduce((sum, count) => sum + count, 0);
+
+  // -------------------------------------------------------------
+  // FUNÇÕES DE SCROLL (Com Correção de Fluidez)
+  // -------------------------------------------------------------
+
+  const scrollToBottom = () => {
+    // 🔑 CORREÇÃO CRÍTICA: Usa requestAnimationFrame para executar APÓS o repaint do DOM
+    requestAnimationFrame(() => {
+      commentsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    });
+  };
 
   // -------------------------------------------------------------
   // FUNÇÃO DE SINCRONIZAÇÃO: Carrega dados do Backend
@@ -26,30 +42,30 @@ const CheckinDetailModal = ({ isOpen, onClose, checkin, onCreateComment }) => { 
     try {
         const fetchedComments = await getCommentsByCheckinId(checkinId);
 
-        // 1. Processar Reações
         const newReactions = {};
-        let commentIdCounter = Date.now(); // Para garantir chaves únicas no mock
+        const userReactions = new Set();
 
-        // Filtra para separar reações de comentários de texto
         const textComments = fetchedComments.filter(c => {
             if (c.reactionEmoji) {
-                // Conta as reações (se o backend salvar cada reação como um objeto Comment)
                 newReactions[c.reactionEmoji] = (newReactions[c.reactionEmoji] || 0) + 1;
-                return false; // É uma reação, não um comentário de texto
+                if (c.user?.id === CURRENT_USER_MOCK_ID) {
+                    userReactions.add(c.reactionEmoji);
+                }
+                return false;
             }
-            return true; // É um comentário de texto
+            return true;
         });
 
         setReactions(newReactions);
+        setCurrentUserReactions(userReactions);
 
-        // 2. Mapear Comentários de Texto
         const mappedComments = textComments.map((c) => ({
-            id: c.id, // ID real do backend
+            id: c.id,
             user: c.user ? c.user.name : 'Membro',
             text: c.content,
             time: new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            userPhoto: daviPhoto, // Mock até ter a foto do user real
-        })).sort((a, b) => new Date(a.time) - new Date(b.time)); // Ordena para cronologia
+            userPhoto: daviPhoto,
+        })).sort((a, b) => new Date(a.time) - new Date(b.time));
 
         setComments(mappedComments);
 
@@ -61,26 +77,30 @@ const CheckinDetailModal = ({ isOpen, onClose, checkin, onCreateComment }) => { 
   };
 
   // -------------------------------------------------------------
-  // EFEITO: CARREGAR DADOS NA ABERTURA/TROCA DE CHECK-IN
+  // EFEITOS DE VIDA DO COMPONENTE
   // -------------------------------------------------------------
+
   useEffect(() => {
     if (isOpen && checkin?.apiId) {
       loadInitialData(checkin.apiId);
       setCommentText('');
-      // ⚠️ IMPORTANTE: Se o checkin.apiId não estiver sendo passado na key do componente pai,
-      // este useEffect precisa lidar com a limpeza manual se a prop 'checkin' mudar.
     } else {
-        // Limpar estados ao fechar o modal
         setComments([]);
         setReactions({});
+        setCurrentUserReactions(new Set());
     }
-  }, [isOpen, checkin?.apiId]); // 🔑 Depende da abertura e do ID do Check-in
+  }, [isOpen, checkin?.apiId]);
 
-  // -------------------------------------------------------------
-  // FUNÇÕES DE SUBMISSÃO (Integração com a API)
-  // -------------------------------------------------------------
+  // 🛑 Efeito de scroll (Chamado APÓS a lista de comentários mudar)
+  // ESTE BLOCO REDUNDANTE FOI REMOVIDO PARA EVITAR CONFLITO
+  /*
+  useEffect(() => {
+    scrollToBottom();
+  }, [comments]);
+  */
 
-  // 🔑 Substitui handleAddComment: Envio de Comentário de Texto
+
+  // Envio de Comentário de Texto (Ajustado com scroll manual)
   const handleSendComment = async (e) => {
     e.preventDefault();
     if (commentText.trim() === '' || loadingComments || !checkin?.apiId) return;
@@ -89,13 +109,12 @@ const CheckinDetailModal = ({ isOpen, onClose, checkin, onCreateComment }) => { 
         const newCommentApi = await onCreateComment(
             checkin.apiId,
             commentText,
-            null // Não é uma reação de emoji
+            null
         );
 
-        // Mapeia o objeto retornado pela API para a UI e adiciona localmente
         const newCommentForUI = {
             id: newCommentApi.id,
-            user: newCommentApi.user ? newCommentApi.user.name : 'Você', // Deve ser o nome do usuário logado
+            user: newCommentApi.user ? newCommentApi.user.name : 'Você',
             text: newCommentApi.content,
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             userPhoto: daviPhoto,
@@ -104,41 +123,49 @@ const CheckinDetailModal = ({ isOpen, onClose, checkin, onCreateComment }) => { 
         setComments(prev => [...prev, newCommentForUI]);
         setCommentText('');
 
+        // 🔑 CHAMADA MANUAL: Força o scroll imediatamente após o state update (fluidez)
+        scrollToBottom();
+
     } catch (error) {
         alert('Falha ao enviar comentário.');
         console.error(error);
     }
   };
 
-  // 🔑 Substitui handleReaction: Envio de Reação/Emoji
-  const handleSendReaction = async (emoji) => {
+  // Ação de Reação (Mantida)
+  const handleActionReaction = async (emoji) => {
     if (loadingComments || !checkin?.apiId) return;
 
     try {
-        // Envia a reação (Conteúdo nulo, apenas emoji)
-        await onCreateComment(checkin.apiId, null, emoji);
+        if (currentUserReactions.has(emoji)) {
+            await removeReaction(checkin.apiId, emoji);
+        } else {
+            await onCreateComment(checkin.apiId, null, emoji);
+        }
 
-        // Atualiza o estado local para dar feedback imediato
-        setReactions(prev => ({
-            ...prev,
-            [emoji]: (prev[emoji] || 0) + 1,
-        }));
+        // Recarrega dados, o que forçará a atualização de [comments] e [reactions]
+        await loadInitialData(checkin.apiId);
+
+        // 🔑 CHAMADA MANUAL: Garante que a tela role após a recarga da API
+        scrollToBottom();
 
         setShowEmojiPicker(false);
 
     } catch (error) {
-        alert('Falha ao enviar reação.');
-        console.error(error);
+        if (error.status === 409 || (error.message && error.message.includes('409'))) {
+             console.log(`Tentativa de reação duplicada ignorada.`);
+        } else {
+            alert('Falha na operação de reação.');
+            console.error(error);
+        }
     }
   };
-
-  // -------------------------------------------------------------
 
   if (!isOpen || !checkin) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden" style={{ background: '#EDEDED' }}>
+      <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden" style={{ background: '#EDEDED' }}>
         {/* Header */}
         <div className="flex items-center justify-start p-4 pt-6" style={{ background: '#EDEDED' }}>
           <button
@@ -157,11 +184,11 @@ const CheckinDetailModal = ({ isOpen, onClose, checkin, onCreateComment }) => { 
               <img
                 src={checkin.photo}
                 alt={checkin.activity}
-                className="w-full max-h-96 object-cover rounded-2xl"
+                className="w-full h-64 object-cover rounded-2xl"
               />
             ) : (
               <div className="w-full h-64 flex items-center justify-center rounded-2xl" style={{ background: '#2E67D3' }}>
-                <span className="text-8xl">🏃</span>
+                <span className="text-7xl">🏃</span>
               </div>
             )}
           </div>
@@ -177,7 +204,7 @@ const CheckinDetailModal = ({ isOpen, onClose, checkin, onCreateComment }) => { 
                 />
               ) : (
                 <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold" style={{ background: '#2E67D3' }}>
-                  {checkin.user.name.charAt(0)}
+                  {checkin.user.charAt(0)}
                 </div>
               )}
               <div className="flex-1">
@@ -220,15 +247,22 @@ const CheckinDetailModal = ({ isOpen, onClose, checkin, onCreateComment }) => { 
           {/* Reações */}
           <div className="py-4">
             {/* Mostrar reações existentes */}
-            {Object.keys(reactions).length > 0 && (
+            {totalReactions > 0 && (
               <div className="flex items-center gap-2 flex-wrap mb-3">
                 {Object.entries(reactions).map(([emoji, count]) => (
                   <button
                     key={emoji}
-                    // ⚠️ Nota: Clicar aqui deve remover a reação, mas por simplicidade, apenas chama o handler.
-                    onClick={() => handleSendReaction(emoji)}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-full text-white hover:opacity-90 transition-opacity"
-                    style={{ background: '#2E67D3' }}
+                    onClick={() => handleActionReaction(emoji)}
+                    className={`flex items-center gap-1 px-3 py-1.5 rounded-full hover:opacity-90 transition-opacity ${
+                        currentUserReactions.has(emoji)
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white border text-gray-700'
+                    }`}
+                    style={{
+                        borderColor: currentUserReactions.has(emoji) ? '' : '#2E67D3',
+                        background: currentUserReactions.has(emoji) ? '#2E67D3' : '#FFFFFF',
+                        color: currentUserReactions.has(emoji) ? 'white' : '#2E67D3'
+                    }}
                   >
                     <span className="text-lg">{emoji}</span>
                     <span className="text-sm font-semibold">{count}</span>
@@ -237,7 +271,7 @@ const CheckinDetailModal = ({ isOpen, onClose, checkin, onCreateComment }) => { 
               </div>
             )}
 
-            {/* Botão de reagir */}
+            {/* Botão de reagir (Abre o Picker) */}
             <div className="relative">
               <button
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
@@ -252,7 +286,7 @@ const CheckinDetailModal = ({ isOpen, onClose, checkin, onCreateComment }) => { 
                   {availableEmojis.map((emoji) => (
                     <button
                       key={emoji}
-                      onClick={() => handleSendReaction(emoji)} // 🔑 Chama a função de envio de reação
+                      onClick={() => handleActionReaction(emoji)}
                       className="text-2xl hover:scale-125 transition-transform"
                     >
                       {emoji}
@@ -262,40 +296,43 @@ const CheckinDetailModal = ({ isOpen, onClose, checkin, onCreateComment }) => { 
               )}
             </div>
           </div>
-
           {/* Comentários */}
           <div className="py-4">
             {/* Lista de comentários */}
-            {loadingComments ? (
-                <p className="text-gray-500 text-sm">Carregando comentários...</p>
-            ) : comments.length > 0 ? (
-                <div className="space-y-3 mb-4">
-                    {comments.map((c) => (
-                        <div key={c.id} className="flex gap-2 items-start">
-                            {c.userPhoto ? (
-                            <img
-                                src={c.userPhoto}
-                                alt={c.user}
-                                className="w-7 h-7 rounded-full object-cover flex-shrink-0"
-                            />
-                            ) : (
-                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0" style={{ background: '#2E67D3' }}>
-                                {c.user.charAt(0)}
-                            </div>
-                            )}
-                            <div className="flex-1">
-                            <p className="text-sm">
-                                <span className="font-semibold" style={{ color: '#212121' }}>{c.user}</span>
-                                <span className="text-gray-400 ml-1 text-xs">{c.time}</span>
-                            </p>
-                            <p className="text-sm mt-0.5" style={{ color: '#212121' }}>{c.text}</p>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            ) : (
-                <p className="text-gray-500 text-sm">Nenhum comentário ainda.</p>
-            )}
+            <div className="space-y-3 max-h-48 overflow-y-auto mb-4 border-t pt-4">
+              {loadingComments ? (
+                  <p className="text-gray-500 text-sm">Carregando comentários...</p>
+              ) : comments.length > 0 ? (
+                  <div className="space-y-3 mb-4">
+                      {comments.map((c) => (
+                          <div key={c.id} className="flex gap-2 items-start">
+                              {c.userPhoto ? (
+                              <img
+                                  src={c.userPhoto}
+                                  alt={c.user}
+                                  className="w-7 h-7 rounded-full object-cover flex-shrink-0"
+                              />
+                              ) : (
+                              <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0" style={{ background: '#2E67D3' }}>
+                                  {c.user.charAt(0)}
+                              </div>
+                              )}
+                              <div className="flex-1">
+                              <p className="text-sm">
+                                  <span className="font-semibold" style={{ color: '#212121' }}>{c.user}</span>
+                                  <span className="text-gray-400 ml-1 text-xs">{c.time}</span>
+                              </p>
+                              <p className="text-sm mt-0.5" style={{ color: '#212121' }}>{c.text}</p>
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              ) : (
+                  <p className="text-gray-500 text-sm">Nenhum comentário ainda.</p>
+              )}
+              {/* 🔑 Elemento de Referência para Scroll */}
+              <div ref={commentsEndRef} />
+            </div>
           </div>
         </div>
 
@@ -303,7 +340,7 @@ const CheckinDetailModal = ({ isOpen, onClose, checkin, onCreateComment }) => { 
         <form onSubmit={handleSendComment} className="flex gap-2 p-4 border-t" style={{ background: '#FFFFFF' }}>
           <input
             type="text"
-            value={commentText} // 🔑 Usando commentText
+            value={commentText}
             onChange={(e) => setCommentText(e.target.value)}
             placeholder="Adicione um comentário..."
             className="flex-1 px-4 py-2 border rounded-full focus:outline-none focus:ring-2 transition-all"

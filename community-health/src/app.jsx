@@ -8,8 +8,8 @@ import CheckinDetailModal from './components/checkinDetailModal';
 import GroupInfoScreen from './components/groupInfoScreen';
 import CreateGroupModal from './components/createGroupModal';
 import ChatScreen from './components/chatScreen';
-// Importe as funções da API
-import { createGroup, getAllGroups, createCheckin, getCheckinsByGroupId, createComment } from './services/groupService'; // <-- 🔑 IMPORTAÇÃO AJUSTADA
+// 🔑 Importe as funções de API (INCLUINDO uploadImage e updateGroupImageUrl)
+import { createGroup, getAllGroups, createCheckin, getCheckinsByGroupId, createComment, uploadImage, updateGroupImageUrl, uploadCheckinImage } from './services/groupService'; // ⬅️ Adicionei uploadCheckinImage
 
 // Importações locais (imagens)
 import daviPhoto from './imagens/Davi.jpeg';
@@ -45,7 +45,8 @@ function App() {
         activity: apiCheckin.tituloAtividade,
         description: apiCheckin.descricao || '',
         time: new Date(apiCheckin.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        photo: null,
+        // 🔑 CORREÇÃO: Mapeia o photoUrl do backend para o campo 'photo' da UI
+        photo: apiCheckin.photoUrl || null,
         metrics: {
             distance: apiCheckin.metricas.distanciaKm > 0 ? `${apiCheckin.metricas.distanciaKm} km` : null,
             duration: apiCheckin.metricas.duracaoMin > 0 ? `${apiCheckin.metricas.duracaoMin} min` : null,
@@ -101,23 +102,43 @@ function App() {
   // --- FUNÇÕES ---
 
   // Lógica de criação de Check-in (Modificada para usar a API)
-  const handleNewCheckin = async (data) => {
+  // 🔑 RECEBE AGORA O OBJETO FILE do modal (assumindo que ele o passa)
+  const handleNewCheckin = async (data, fileObject) => {
     if (!currentGroup) {
         alert("Selecione um grupo para fazer o check-in.");
         return;
     }
 
     const currentGroupId = currentGroup.id;
+    let photoUrl = null;
+
+    // 1. UPLOAD LOGIC: UPLOAD MULTIPART E OBTENÇÃO DA URL
+    if (fileObject) {
+        try {
+            photoUrl = await uploadCheckinImage(fileObject); // Chama a API de upload
+        } catch (uploadError) {
+            alert(`Falha ao carregar imagem: ${uploadError.message}. O check-in não será criado.`);
+            return; // Interrompe a criação
+        }
+    }
+
+    // 2. FINAL PAYLOAD: Adiciona a URL ao JSON
+    const finalCheckinData = {
+        ...data,
+        photoUrl: photoUrl // 🔑 Inclui a URL salva no backend no payload
+    };
 
     try {
-        const newCheckinFromApi = await createCheckin(data, currentGroupId);
+        // 3. CRIA O CHECK-IN
+        const newCheckinFromApi = await createCheckin(finalCheckinData, currentGroupId);
 
-        // 3. Mapeamento dos Dados para a UI (reutiliza o mapper)
+        // 4. Mapeamento e Atualização da UI
+        // Recria o objeto UI do Check-in e o insere na lista
         const newCheckinForUI = mapApiCheckinsToUI([newCheckinFromApi])[0];
 
-        // 4. Atualiza a UI, adicionando o novo item no topo
         setActivities(prevActivities => [newCheckinForUI, ...prevActivities]);
         setIsModalOpen(false);
+
     } catch (error) {
         console.error("Erro ao salvar Check-in via API:", error);
         alert(`Falha ao criar Check-in. Detalhe: ${error.message}`);
@@ -150,6 +171,38 @@ function App() {
     loadCheckins(group.id);
   };
 
+  // 🖼️ LÓGICA DE UPLOAD/ATUALIZAÇÃO DE IMAGEM DO GRUPO (HEADER)
+  const handleGroupImageChange = async (fileObject) => { // Recebe o objeto File
+    if (!currentGroup || !fileObject) return;
+
+    // ⚠️ Feedback visual temporário é tratado dentro do GroupHeader.jsx
+
+    try {
+        // 1. CHAMA O UPLOAD MULTIPART: Envia o arquivo real para o servidor
+        const uploadedUrl = await uploadImage(fileObject);
+
+        // 2. ATUALIZA O BANCO DE DADOS: Envia a URL salva de volta ao GroupController (PUT)
+        const updatedGroup = await updateGroupImageUrl(currentGroup.id, uploadedUrl);
+
+        // 3. ATUALIZA ESTADOS LOCAIS (Renderiza a nova imagem)
+        const updatedImage = updatedGroup.imageUrl || uploadedUrl; // Usa o valor retornado
+
+        setCurrentGroupData({ ...currentGroupData, image: updatedImage });
+
+        // Atualiza a lista lateral de grupos
+        setGroups(groups.map(g =>
+            g.id === currentGroup.id ? { ...g, imageUrl: updatedImage } : g
+        ));
+
+        setCurrentGroup({ ...currentGroup, imageUrl: updatedImage });
+
+    } catch (error) {
+        console.error("Falha ao atualizar foto do grupo:", error);
+        alert("Não foi possível atualizar a imagem. Tente novamente.");
+    }
+  };
+
+
   //Lógica de criação de Grupo
   const handleCreateGroup = async (formData) => {
 
@@ -161,10 +214,20 @@ function App() {
        description: formData.description || null,
        durationDays: Number(formData.duration),
        isPrivate: formData.isPrivate,
+       // Imagem é tratada pelo modal e incluída no payload se o upload funcionar
+       imageUrl: formData.imageUrl || null,
      };
 
      try {
+         // 🔑 CORREÇÃO: Chame a API e defina a variável primeiro
          const newGroupFromApi = await createGroup(groupDataToSend, ownerId);
+
+         // 🛑 Checagem de objeto válido agora é segura
+         if (!newGroupFromApi || !newGroupFromApi.id) {
+             console.error("API retornou objeto inválido ou sem ID.");
+             // Lançamos um erro para cair no bloco catch e dar feedback
+             throw new Error("Erro na API: Objeto de grupo retornado inválido. O servidor pode ter falhado.");
+         }
 
          // Adiciona o novo grupo retornado pela API à lista
          setGroups(prevGroups => [...prevGroups, newGroupFromApi]);
@@ -173,10 +236,12 @@ function App() {
          const newGroupData = {
            id: newGroupFromApi.id,
            name: newGroupFromApi.name,
+           // 🔑 Usa a URL salva (ou null)
            image: newGroupFromApi.imageUrl || null,
            daysRemaining: newGroupFromApi.durationDays,
            myCheckins: 0,
-           leader: { name: 'salada de fruta', checkins: 0 },
+           // 🔑 Mapeamento seguro do nome do Owner
+           leader: { name: newGroupFromApi.owner?.name || 'salada de fruta', checkins: 0 },
            description: newGroupFromApi.description,
            isPrivate: newGroupFromApi.isPrivate,
          };
@@ -191,17 +256,9 @@ function App() {
          setIsCreateGroupModalOpen(false); // Fecha o modal
      } catch (error) {
          console.error("Falha ao criar grupo:", error);
+         // Exibe o erro no console e no alert
          alert(`Falha ao criar grupo. Detalhe: ${error.message}`);
      }
-  };
-
-  const handleGroupImageChange = (newImage) => {
-    // ⚠️ Lógica de Imagem (mantida como mock, precisará de API)
-    setCurrentGroupData({ ...currentGroupData, image: newImage });
-    setGroups(groups.map(g =>
-      g.id === currentGroup.id ? { ...g, image: newImage } : g
-    ));
-    setCurrentGroup({ ...currentGroup, image: newImage });
   };
 
   const handleChatClick = () => {
@@ -264,7 +321,7 @@ function App() {
           <GroupHeader
             group={currentGroupData}
             onShowInfo={() => setShowGroupInfo(true)}
-            onImageChange={handleGroupImageChange}
+            onImageChange={handleGroupImageChange} // 🔑 LIGA A FUNÇÃO DE ORQUESTRAÇÃO
           />
           <ActivityFeed activities={activities} onCheckinClick={handleCheckinClick} />
         </main>
@@ -281,16 +338,15 @@ function App() {
       {/* Modal de Check-in */}
       <CheckinModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => setIsModalOpen(false)} // ✅ CORRIGIDO
         onSubmit={handleNewCheckin}
       />
 
       {/* Modal de Detalhes do Check-in */}
       <CheckinDetailModal
           isOpen={isDetailModalOpen}
-          onClose={() => setIsDetailModalOpen(false)}
+          onClose={() => setIsDetailModalOpen(false)} // ✅ CORRIGIDO
           checkin={selectedCheckin}
-          // 🔑 A ÚNICA ALTERAÇÃO NECESSÁRIA AQUI
           onCreateComment={createComment}
       />
 

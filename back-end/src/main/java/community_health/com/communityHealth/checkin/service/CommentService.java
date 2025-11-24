@@ -10,9 +10,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 import jakarta.transaction.Transactional;
 import jakarta.persistence.EntityNotFoundException;
-import org.springframework.web.bind.annotation.GetMapping;
-
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class CommentService {
@@ -29,18 +28,32 @@ public class CommentService {
     }
 
     /**
-     * Cria um novo comentário ou reação em um Check-in.
+     * Cria um novo comentário ou reação, aplicando a regra de reação única.
      */
     @Transactional
     public Comment createComment(Comment commentData, Long checkinId, Long userId) {
 
-        // 1. Validar e carregar o Check-in
+        // 1. Validar e carregar o Check-in e o Usuário
         Checkin checkin = checkinRepository.findById(checkinId)
                 .orElseThrow(() -> new EntityNotFoundException("Checkin não encontrado com ID: " + checkinId));
 
-        // 2. Validar e carregar o Usuário
         User user = userService.getUserById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("Usuário (Comentarista) não encontrado com ID: " + userId));
+
+        // 2. REGRA DE NEGÓCIO: Impedir reações duplicadas
+        if (commentData.getContent() == null && commentData.getReactionEmoji() != null) {
+            String emoji = commentData.getReactionEmoji();
+
+            // 🔑 A verificação é feita. Se a exclusão anterior comitou, esta deve retornar vazio.
+            boolean reactionExists = commentRepository
+                    .findByCheckinIdAndUserIdAndReactionEmoji(checkinId, userId, emoji)
+                    .isPresent();
+
+            if (reactionExists) {
+                // Lança exceção 409 CONFLICT (confirmação da regra)
+                throw new RuntimeException("O usuário já reagiu com o emoji '" + emoji + "' neste Check-in.");
+            }
+        }
 
         // 3. Associar os objetos
         commentData.setCheckin(checkin);
@@ -50,8 +63,25 @@ public class CommentService {
         return commentRepository.save(commentData);
     }
 
-    // Método para carregar comentários de um Check-in (para a tela de detalhes)
-    @GetMapping
+    /**
+     * 🆕 Método para remover uma reação específica de um usuário.
+     * @Transactional garante que o commit da deleção ocorra.
+     */
+    @Transactional
+    public void removeReaction(Long checkinId, Long userId, String emoji) {
+        Optional<Comment> existingReaction = commentRepository
+                .findByCheckinIdAndUserIdAndReactionEmoji(checkinId, userId, emoji);
+
+        if (existingReaction.isPresent()) {
+            commentRepository.delete(existingReaction.get());
+        } else {
+            throw new EntityNotFoundException("Reação não encontrada para remoção.");
+        }
+    }
+
+    /**
+     * Método para carregar comentários de um Check-in.
+     */
     public List<Comment> getCommentsByCheckinId(Long checkinId) {
         return commentRepository.findByCheckinIdOrderByCreatedAtAsc(checkinId);
     }

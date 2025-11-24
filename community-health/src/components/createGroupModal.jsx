@@ -1,24 +1,35 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Upload, Lock, Unlock } from 'lucide-react';
+// 🔑 Importar a função de upload (assumida como implementada em groupService.js)
+import { uploadImage } from '../services/groupService';
 
 const CreateGroupModal = ({ isOpen, onClose, onSubmit }) => {
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
   const [duration, setDuration] = useState('30');
-  const [imagePreview, setImagePreview] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null); // String Base64 para visualização
   const [isPrivate, setIsPrivate] = useState(false);
+
+  // 🆕 NOVO ESTADO: Armazena o objeto File real para o upload
+  const [imageFile, setImageFile] = useState(null);
+  const [isUploading, setIsUploading] = useState(false); // Estado para feedback de upload
 
   React.useEffect(() => {
     if (!isOpen) {
       setImagePreview(null);
+      setImageFile(null); // Limpa o File object ao fechar
     }
   }, [isOpen]);
 
+  // 🔑 ATUALIZADO: Salva o objeto File real no estado (para uso no handleSubmit)
   const handleGroupImageChange = (e) => {
     e.stopPropagation();
     e.preventDefault();
     const file = e.target.files[0];
     if (file) {
+      setImageFile(file); // 🔑 Salva o objeto File
+
+      // Lógica de visualização (Base64)
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result);
@@ -27,30 +38,45 @@ const CreateGroupModal = ({ isOpen, onClose, onSubmit }) => {
     }
   };
 
-  const handleSubmit = (e) => {
+  // 🔑 ATUALIZADO: Gerencia a sequência de Upload (MultiPart) -> Criação (JSON)
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!groupName.trim()) {
       alert('Por favor, insira um nome para o grupo');
       return;
     }
 
+    let finalImageUrl = null;
+    setIsUploading(true);
+
+    // 1. FAZER UPLOAD SE HOUVER UM ARQUIVO SELECIONADO
+    if (imageFile) {
+        try {
+            // Chama a API de upload MultiPart (retorna a URL real)
+            finalImageUrl = await uploadImage(imageFile);
+        } catch (uploadError) {
+            setIsUploading(false);
+            alert(`Falha crítica ao carregar imagem: ${uploadError.message}. O grupo não será criado.`);
+            return; // Interrompe a criação do grupo se o upload falhar
+        }
+    }
+
+    // 2. CRIAR O OBJETO DE DADOS FINAL COM A URL OBTIDA
     const groupData = {
       name: groupName,
       description: groupDescription,
       duration: parseInt(duration),
-      image: imagePreview,
+      imageUrl: finalImageUrl, // 🔑 ENVIA A URL REAL para o GroupController (Backend)
       isPrivate: isPrivate,
     };
 
+    // 3. Submete os dados limpos (JSON) para a criação do grupo
     onSubmit(groupData);
-    
-    setGroupName('');
-    setGroupDescription('');
-    setDuration('30');
-    setImagePreview(null);
-    setIsPrivate(false);
-    onClose();
+
+    // Limpeza de estado local
+    setIsUploading(false);
+    handleClose(); // Chama o método de fechamento que limpa o estado
   };
 
   const handleClose = () => {
@@ -58,6 +84,7 @@ const CreateGroupModal = ({ isOpen, onClose, onSubmit }) => {
     setGroupDescription('');
     setDuration('30');
     setImagePreview(null);
+    setImageFile(null); // Limpeza adicional do File object
     setIsPrivate(false);
     onClose();
   };
@@ -92,7 +119,9 @@ const CreateGroupModal = ({ isOpen, onClose, onSubmit }) => {
               />
               <label
                 htmlFor="create-group-image-input"
-                className="flex items-center justify-center w-full h-40 border-2 border-dashed border-gray-300 rounded-2xl cursor-pointer hover:border-blue-400 transition-colors bg-gray-50 hover:bg-blue-50"
+                className={`flex items-center justify-center w-full h-40 border-2 border-dashed rounded-2xl cursor-pointer transition-colors
+                  ${isUploading ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400 bg-gray-50 hover:bg-blue-50'}`
+                }
               >
                 {imagePreview ? (
                   <img
@@ -100,6 +129,10 @@ const CreateGroupModal = ({ isOpen, onClose, onSubmit }) => {
                     alt="Preview"
                     className="w-full h-full object-cover rounded-2xl"
                   />
+                ) : isUploading ? ( // Feedback de Carregamento
+                    <div className="text-center">
+                        <p className="text-sm font-semibold text-blue-700">Fazendo Upload...</p>
+                    </div>
                 ) : (
                   <div className="text-center">
                     <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
@@ -121,6 +154,7 @@ const CreateGroupModal = ({ isOpen, onClose, onSubmit }) => {
               onChange={(e) => setGroupName(e.target.value)}
               placeholder="Ex: Operação Foco Total"
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={isUploading}
             />
           </div>
 
@@ -134,6 +168,7 @@ const CreateGroupModal = ({ isOpen, onClose, onSubmit }) => {
               placeholder="Descreva o objetivo do grupo..."
               rows="3"
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              disabled={isUploading}
             />
           </div>
 
@@ -150,6 +185,7 @@ const CreateGroupModal = ({ isOpen, onClose, onSubmit }) => {
               max="365"
               placeholder="30"
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={isUploading}
             />
             <p className="text-xs text-gray-500 mt-1">Entre 1 e 365 dias</p>
           </div>
@@ -167,12 +203,13 @@ const CreateGroupModal = ({ isOpen, onClose, onSubmit }) => {
                     ? 'bg-blue-50 border-2 border-blue-500'
                     : 'border-2 border-gray-200 hover:border-gray-300'
                 }`}
+                disabled={isUploading}
               >
-                <Unlock 
-                  className="w-5 h-5" 
+                <Unlock
+                  className="w-5 h-5"
                   style={{ color: !isPrivate ? '#2E67D3' : '#6B7280' }}
                 />
-                <span 
+                <span
                   className="text-sm font-medium"
                   style={{ color: !isPrivate ? '#2E67D3' : '#6B7280' }}
                 >
@@ -187,12 +224,13 @@ const CreateGroupModal = ({ isOpen, onClose, onSubmit }) => {
                     ? 'bg-blue-50 border-2 border-blue-500'
                     : 'border-2 border-gray-200 hover:border-gray-300'
                 }`}
+                disabled={isUploading}
               >
-                <Lock 
-                  className="w-5 h-5" 
+                <Lock
+                  className="w-5 h-5"
                   style={{ color: isPrivate ? '#2E67D3' : '#6B7280' }}
                 />
-                <span 
+                <span
                   className="text-sm font-medium"
                   style={{ color: isPrivate ? '#2E67D3' : '#6B7280' }}
                 >
@@ -207,6 +245,7 @@ const CreateGroupModal = ({ isOpen, onClose, onSubmit }) => {
               type="button"
               onClick={handleClose}
               className="px-4 py-2 border border-gray-300 text-gray-700 rounded-full text-sm font-medium hover:bg-gray-50 transition-colors font-['Shanti']"
+              disabled={isUploading}
             >
               Cancelar
             </button>
@@ -214,8 +253,9 @@ const CreateGroupModal = ({ isOpen, onClose, onSubmit }) => {
               type="submit"
               className="px-6 py-2 text-white rounded-full text-sm font-medium hover:bg-blue-700 transition-colors font-['Shanti']"
               style={{ background: '#2E67D3' }}
+              disabled={isUploading} // Desabilita o botão enquanto o upload está em andamento
             >
-              Criar Grupo
+              {isUploading ? 'Carregando...' : 'Criar Grupo'}
             </button>
           </div>
         </form>

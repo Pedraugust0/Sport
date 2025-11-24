@@ -8,7 +8,7 @@ INSERT INTO Users (
     -- photo_url e memberships (relacionamento) são opcionais aqui
 ) VALUES (
     1,
-    'Davi de Souza (Owner Teste)',
+    'James (Owner Teste)',
     'davi.teste@communityhealth.com',
     'hashed_password_for_123',
     1,

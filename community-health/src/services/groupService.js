@@ -1,4 +1,4 @@
-// 🚩 Defina a URL da API no topo do arquivo para que ambas as funções possam acessá-la
+// 🚩 Defina a URL da API no topo do arquivo
 const API_URL_BASE = "http://localhost:8080/api";
 
 // ⚠️ USER ID HARDCODED PARA TESTE
@@ -9,11 +9,8 @@ const CURRENT_USER_ID = 1;
 // =============================================================
 
 /**
- * Envia os dados do novo Check-in para o backend.
- * Corresponde ao endpoint: POST /api/checkins?groupId={UUID}&userId={ID}
- * @param {object} checkinData - Objeto contendo os dados do formulário de check-in.
- * @param {string} groupId - O UUID do grupo atual.
- * @returns {Promise<object>} O objeto Checkin retornado pela API.
+ * Envia os dados do novo Check-in para o backend (POST /api/checkins).
+ * Agora espera o photoUrl no checkinData se a foto foi enviada.
  */
 export async function createCheckin(checkinData, groupId) {
     const API_URL = `${API_URL_BASE}/checkins`;
@@ -21,6 +18,8 @@ export async function createCheckin(checkinData, groupId) {
     const checkinToSend = {
         tituloAtividade: checkinData.title,
         descricao: checkinData.description,
+        // Inclui a URL da foto, se presente (assumindo que o App.js a incluiu)
+        photoUrl: checkinData.photoUrl || null,
         metricas: {
             distanciaKm: checkinData.distance ? Number(checkinData.distance) : 0.0,
             duracaoMin: checkinData.duration ? Number(checkinData.duration) : 0,
@@ -37,7 +36,7 @@ export async function createCheckin(checkinData, groupId) {
 
         if (!res.ok) {
             const errorText = await res.text();
-            throw new Error(`Erro ${res.status} ao criar Check-in: ${errorText}`);
+            throw { status: res.status, message: errorText };
         }
 
         return res.json();
@@ -49,10 +48,7 @@ export async function createCheckin(checkinData, groupId) {
 }
 
 /**
- * Função para buscar Check-ins de um grupo específico.
- * Corresponde ao endpoint: GET /api/checkins?groupId={UUID}
- * @param {string} groupId O UUID do grupo para filtrar as atividades.
- * @returns {Promise<Array<object>>} Lista de check-ins.
+ * Função para buscar Check-ins de um grupo específico (GET /api/checkins).
  */
 export async function getCheckinsByGroupId(groupId) {
     const API_URL = `${API_URL_BASE}/checkins`;
@@ -73,21 +69,52 @@ export async function getCheckinsByGroupId(groupId) {
     }
 }
 
+/**
+ * 🔑 FUNÇÃO FALTANTE: Faz o upload de um arquivo MultiPart para o Check-in.
+ * Corresponde ao endpoint: POST /api/checkins/upload
+ */
+export async function uploadCheckinImage(file) {
+    const API_URL = `${API_URL_BASE}/checkins/upload`;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+        const res = await fetch(API_URL, {
+            method: "POST",
+            body: formData,
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(`Erro ${res.status} ao fazer upload do Check-in: ${errorText}`);
+        }
+
+        return res.text(); // Retorna a URL como String
+
+    } catch (error) {
+        console.error("Falha na rede ou servidor ao fazer upload do Check-in:", error);
+        throw error;
+    }
+}
+
 // =============================================================
-// FUNÇÕES DE GRUPO
+// FUNÇÕES DE GRUPO (CRUD & RANKING)
 // =============================================================
 
 /**
- * Envia os dados do novo Grupo para o backend.
- * Corresponde ao endpoint: POST /api/groups?ownerId={ID}
+ * Envia os dados do novo Grupo para o backend (POST /api/groups).
  */
 export async function createGroup(groupData, ownerId) {
     const API_URL = `${API_URL_BASE}/groups`;
 
+    // 🔑 AJUSTE: Removemos a Base64 string (se existir) do payload JSON.
+    const { image, ...groupDataToSend } = groupData;
+
     const res = await fetch(`${API_URL}?ownerId=${ownerId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(groupData),
+        body: JSON.stringify(groupDataToSend), // Envia o payload limpo
     });
 
     if (!res.ok) {
@@ -99,8 +126,7 @@ export async function createGroup(groupData, ownerId) {
 }
 
 /**
- * Pega a lista de todos os grupos.
- * Corresponde ao endpoint: GET /api/groups
+ * Pega a lista de todos os grupos (GET /api/groups).
  */
 export async function getAllGroups() {
     const API_URL = `${API_URL_BASE}/groups`;
@@ -118,17 +144,90 @@ export async function getAllGroups() {
     }
 }
 
+/**
+ * FUNÇÃO DE RANKING: Busca a lista de classificação (GET /api/groups/{groupId}/ranking).
+ */
+export async function getGroupRanking(groupId) {
+    const API_URL = `${API_URL_BASE}/groups/${groupId}/ranking`;
+
+    try {
+        const res = await fetch(API_URL);
+
+        if (!res.ok) {
+            console.error(`Erro ${res.status} ao buscar o ranking.`);
+            return [];
+        }
+
+        return res.json(); // Retorna List<RankingDto>
+
+    } catch (error) {
+        console.error("Falha na rede ao buscar ranking:", error);
+        return [];
+    }
+}
+
+/**
+ * FUNÇÃO DE UPLOAD DE IMAGEM (PARA GRUPO)
+ */
+export async function uploadImage(file) {
+    const API_URL = `${API_URL_BASE}/groups/upload`;
+
+    const formData = new FormData();
+    formData.append("file", file); // 'file' corresponde ao @RequestParam("file") do Java
+
+    try {
+        const res = await fetch(API_URL, {
+            method: "POST",
+            body: formData, // Envia o arquivo MultiPart
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(`Erro ${res.status} ao fazer upload: ${errorText}`);
+        }
+
+        return res.text(); // O endpoint Java retorna a URL como String
+
+    } catch (error) {
+        console.error("Falha na rede ou servidor ao fazer upload:", error);
+        throw error;
+    }
+}
+
+/**
+ * NOVO MÉTODO: Atualiza a URL da imagem de um grupo existente (PUT /api/groups/{groupId}).
+ */
+export async function updateGroupImageUrl(groupId, imageUrl) {
+    const API_URL = `${API_URL_BASE}/groups/${groupId}`;
+
+    // Apenas envia o campo imageUrl que deve ser atualizado.
+    const dataToSend = { imageUrl: imageUrl };
+
+    try {
+        const res = await fetch(API_URL, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(dataToSend),
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(`Erro ${res.status} ao atualizar imagem do grupo: ${errorText}`);
+        }
+
+        return res.json();
+    } catch (error) {
+        console.error("Falha na rede ao atualizar imagem do grupo:", error);
+        throw error;
+    }
+}
+
 // =============================================================
-// FUNÇÕES DE COMENTÁRIO
+// FUNÇÕES DE COMENTÁRIO/REACTION
 // =============================================================
 
 /**
- * Cria um novo comentário ou reação para um Check-in.
- * Corresponde ao endpoint: POST /api/comments?checkinId={ID}&userId={ID}
- * @param {number} checkinId O ID do Check-in sendo comentado.
- * @param {string} content O texto do comentário.
- * @param {string} reactionEmoji O emoji de reação (opcional).
- * @returns {Promise<object>} O objeto Comment criado.
+ * Cria um novo comentário ou reação para um Check-in (POST /api/comments).
  */
 export async function createComment(checkinId, content, reactionEmoji = null) {
     const API_URL = `${API_URL_BASE}/comments`;
@@ -139,7 +238,6 @@ export async function createComment(checkinId, content, reactionEmoji = null) {
     };
 
     try {
-        // Envia checkinId e userId na URL
         const res = await fetch(`${API_URL}?checkinId=${checkinId}&userId=${CURRENT_USER_ID}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -148,25 +246,48 @@ export async function createComment(checkinId, content, reactionEmoji = null) {
 
         if (!res.ok) {
             const errorText = await res.text();
-            throw new Error(`Erro ${res.status} ao enviar comentário: ${errorText}`);
+            throw { status: res.status, message: errorText };
         }
 
         return res.json();
 
     } catch (error) {
-        console.error("Falha na rede ao enviar comentário:", error);
+        console.error("Falha na rede ao enviar comentário/reação:", error);
         throw error;
     }
 }
-// Adicione esta função ao final do seu groupService.js
-// --------------------------------------------------------------------------
-export async function getCommentsByCheckinId(checkinId) {
-    // ⚠️ Certifique-se de que a API_URL_BASE está definida no topo do arquivo
-    const API_URL_BASE = "http://localhost:8080/api";
+
+/**
+ * FUNÇÃO DE REMOÇÃO: Remove uma reação específica (DELETE /api/comments).
+ */
+export async function removeReaction(checkinId, emoji) {
     const API_URL = `${API_URL_BASE}/comments`;
 
     try {
-        // GET /api/comments?checkinId={id} para buscar todos os comentários
+        const res = await fetch(`${API_URL}?checkinId=${checkinId}&userId=${CURRENT_USER_ID}&emoji=${emoji}`, {
+            method: "DELETE",
+        });
+
+        if (res.status === 204) {
+            return true;
+        }
+
+        const errorText = await res.text();
+        throw new Error(`Erro ${res.status} ao remover reação: ${errorText}`);
+
+    } catch (error) {
+        console.error("Falha na rede ao remover reação:", error);
+        throw error;
+    }
+}
+
+/**
+ * Busca comentários de um Check-in (GET /api/comments).
+ */
+export async function getCommentsByCheckinId(checkinId) {
+    const API_URL = `${API_URL_BASE}/comments`;
+
+    try {
         const res = await fetch(`${API_URL}?checkinId=${checkinId}`);
 
         if (!res.ok) {
@@ -180,4 +301,3 @@ export async function getCommentsByCheckinId(checkinId) {
         return [];
     }
 }
-// --------------------------------------------------------------------------

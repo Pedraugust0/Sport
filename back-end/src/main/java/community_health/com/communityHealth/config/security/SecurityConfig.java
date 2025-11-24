@@ -17,6 +17,11 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configure(httpSecurity))
                 .authorizeHttpRequests(authorize -> authorize
+                        // Permite acesso explícito aos recursos estáticos (upload)
+                        // para garantir que a requisição não seja interceptada.
+                        .requestMatchers("/uploads/**").permitAll()
+
+                        // Permite acesso a todos os outros requests
                         .anyRequest().permitAll()
                 );
 

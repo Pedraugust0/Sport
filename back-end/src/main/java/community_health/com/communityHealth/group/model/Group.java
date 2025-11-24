@@ -8,7 +8,7 @@ import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.UUID;
+
 import java.util.List;
 
 @Entity
@@ -18,7 +18,7 @@ public class Group {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
-    private UUID id;
+    private Long id;
 
     // ANOTAÇÃO PARA QUEBRAR O CICLO: Não serialize os membros ao serializar o Grupo
     @JsonIgnore

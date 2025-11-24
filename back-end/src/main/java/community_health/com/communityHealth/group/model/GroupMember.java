@@ -6,7 +6,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
-import java.util.UUID;
+
 
 @Entity
 @Table(name = "Group_Members")
@@ -15,7 +15,7 @@ public class GroupMember {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
-    private UUID id;
+    private Long id;
 
     @ManyToOne
     @JoinColumn(name = "group_id", nullable = false)

@@ -2,12 +2,15 @@ package community_health.com.communityHealth.checkin.controller;
 
 import community_health.com.communityHealth.checkin.model.Checkin;
 import community_health.com.communityHealth.checkin.service.CheckinService;
+import community_health.com.communityHealth.utils.FileUploadUtil; // 🔑 Importar o utilitário
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import java.util.UUID;
+import org.springframework.web.multipart.MultipartFile; // 🔑 Importar para upload
+import java.io.IOException;
+
 import java.util.List;
 
 @RestController
@@ -22,13 +25,14 @@ public class CheckinController {
     }
 
     /**
-     * Endpoint para criar um novo Check-in.
+     * Endpoint para criar um novo Check-in (Dados JSON).
+     * O 'Checkin' recebido pode conter o photoUrl pré-preenchido.
      */
     @PostMapping
     public ResponseEntity<Object> createCheckin(
             @RequestBody Checkin checkin,
-            @RequestParam UUID groupId,
-            @RequestParam(defaultValue = "1") Long userId) { // 🆕 Adicionado userId com valor default para teste
+            @RequestParam Long groupId,
+            @RequestParam(defaultValue = "1") Long userId) {
         try {
             // 🔑 A correção: Passar o userId para o Service
             Checkin createdCheckin = checkinService.createCheckin(checkin, groupId, userId);
@@ -43,10 +47,32 @@ public class CheckinController {
     }
 
     /**
+     * 🆕 NOVO ENDPOINT: Faz o upload da imagem do Check-in e retorna a URL pública.
+     * URL: POST /api/checkins/upload
+     */
+    @PostMapping("/upload")
+    public ResponseEntity<String> uploadCheckinImage(@RequestParam("file") MultipartFile file) {
+        if (file.isEmpty()) {
+            return new ResponseEntity<>("Arquivo vazio.", HttpStatus.BAD_REQUEST);
+        }
+
+        try {
+            // Reutiliza o utilitário de upload que já configuramos
+            String imageUrl = FileUploadUtil.saveFile(file);
+
+            return new ResponseEntity<>(imageUrl, HttpStatus.OK);
+
+        } catch (IOException e) {
+            System.err.println("Erro ao salvar arquivo de imagem do Check-in: " + e.getMessage());
+            return new ResponseEntity<>("Falha ao salvar a imagem. Erro: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
      * Endpoint GET para buscar Check-ins por ID do grupo.
      */
     @GetMapping
-    public ResponseEntity<List<Checkin>> getCheckinsByGroupId(@RequestParam UUID groupId) {
+    public ResponseEntity<List<Checkin>> getCheckinsByGroupId(@RequestParam Long groupId) {
         try {
             List<Checkin> checkins = checkinService.getCheckinsByGroupId(groupId);
             return ResponseEntity.ok(checkins);

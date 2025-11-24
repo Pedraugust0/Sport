@@ -25,6 +25,10 @@ public class Checkin {
     @Column(name = "titulo_atividade", nullable = false)
     private String tituloAtividade;
 
+    // 🆕 NOVO CAMPO: URL da foto do Check-in
+    @Column(name = "photo_url")
+    private String photoUrl;
+
     @Column(columnDefinition = "TEXT")
     private String descricao;
 
