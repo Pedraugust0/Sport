@@ -1,7 +1,7 @@
 package community_health.com.communityHealth.checkin.model;
 
 import community_health.com.communityHealth.group.model.Group;
-import community_health.com.communityHealth.usuario.model.User;
+import community_health.com.communityHealth.user.model.User;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;

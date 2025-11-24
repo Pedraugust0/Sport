@@ -2,7 +2,7 @@ package community_health.com.communityHealth.group.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import community_health.com.communityHealth.checkin.model.Checkin;
-import community_health.com.communityHealth.usuario.model.User;
+import community_health.com.communityHealth.user.model.User;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
@@ -12,15 +12,14 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @Entity
-@Table(name = "Groups")
+@Table(name = "`Groups`") // deixe as `` pois a bomba do mysql usa groups como palavra reservada, ai o ` resolve
 @Data
 public class Group {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // ANOTAÇÃO PARA QUEBRAR O CICLO: Não serialize os membros ao serializar o Grupo
     @JsonIgnore
     @OneToMany(mappedBy = "group")
     private List<GroupMember> members;

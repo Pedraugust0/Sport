@@ -34,13 +34,16 @@ public class CheckinController {
             @RequestParam Long groupId,
             @RequestParam(defaultValue = "1") Long userId) {
         try {
-            // 🔑 A correção: Passar o userId para o Service
             Checkin createdCheckin = checkinService.createCheckin(checkin, groupId, userId);
+
             return new ResponseEntity<>(createdCheckin, HttpStatus.CREATED);
+
         } catch (IllegalArgumentException e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+
         } catch (EntityNotFoundException e) {
             return new ResponseEntity<>("Grupo não encontrado ou Usuário não encontrado.", HttpStatus.NOT_FOUND);
+
         } catch (Exception e) {
             return new ResponseEntity<>("Erro interno ao criar checkin.", HttpStatus.INTERNAL_SERVER_ERROR);
         }

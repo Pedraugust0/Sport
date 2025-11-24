@@ -4,7 +4,7 @@ package community_health.com.communityHealth.chat.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties; // 🔑 NOVA IMPORTAÇÃO
 import community_health.com.communityHealth.group.model.Group;
-import community_health.com.communityHealth.usuario.model.User;
+import community_health.com.communityHealth.user.model.User;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;

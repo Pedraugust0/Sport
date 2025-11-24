@@ -6,8 +6,8 @@ import community_health.com.communityHealth.chat.model.GroupMessage;
 import community_health.com.communityHealth.chat.repository.GroupMessageRepository;
 import community_health.com.communityHealth.group.model.Group;
 import community_health.com.communityHealth.group.repository.GroupRepository;
-import community_health.com.communityHealth.usuario.model.User;
-import community_health.com.communityHealth.usuario.repository.UserRepository;
+import community_health.com.communityHealth.user.model.User;
+import community_health.com.communityHealth.user.repository.UserRepository;
 
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;

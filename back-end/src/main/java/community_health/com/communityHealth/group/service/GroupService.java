@@ -4,22 +4,24 @@ import community_health.com.communityHealth.checkin.repository.CheckinRepository
 import community_health.com.communityHealth.group.dto.RankingDto;
 import community_health.com.communityHealth.group.model.Group;
 import community_health.com.communityHealth.group.repository.GroupRepository;
-import community_health.com.communityHealth.usuario.model.User;
-import community_health.com.communityHealth.usuario.service.UserService; // Assumindo que você tem um UserService
+import community_health.com.communityHealth.user.model.User;
+import community_health.com.communityHealth.user.service.UserService;
+import community_health.com.communityHealth.utils.FileUploadUtil;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
-import jakarta.persistence.EntityNotFoundException;
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
-
 
 @Service
 public class GroupService {
 
     private final GroupRepository groupRepository;
-    private final UserService userService; // Para buscar o Owner
+    private final UserService userService;
     private final CheckinRepository checkinRepository;
 
     @Autowired
@@ -30,29 +32,34 @@ public class GroupService {
     }
 
     /**
-     * Cria um novo grupo, definindo a data de início (startDate) para agora
-     * e o Owner (dono) a partir do ID fornecido.
-     * @param groupData Dados do grupo a ser criado
-     * @param ownerId ID do usuário que está criando o grupo
-     * @return O Group criado e salvo no banco
+     * Cria um novo grupo recebendo parâmetros individuais e arquivo de imagem.
      */
-    public Group createGroup(Group groupData, Long ownerId) {
+    @Transactional
+    public Group createGroupWithImage(String name, String description, Integer durationDays, Boolean isPrivate, Long ownerId, MultipartFile file) throws IOException {
         // 1. Validar e carregar o Owner
         User owner = userService.getUserById(ownerId)
                 .orElseThrow(() -> new EntityNotFoundException("Owner (User) not found with id: " + ownerId));
 
-        // 2. Aplicar lógica de negócio na criação
-        groupData.setOwner(owner);
+        // 2. Instanciar e popular o Grupo
+        Group group = new Group();
+        group.setName(name);
+        group.setDescription(description);
+        group.setDurationDays(durationDays);
+        group.setIsPrivate(isPrivate);
+        group.setOwner(owner);
 
-        // **IMPORTANTE**: Define a data de início do grupo para o momento da criação
-        if (groupData.getStartDate() == null) {
-            groupData.setStartDate(LocalDateTime.now());
+        // Define data de início agora
+        group.setStartDate(LocalDateTime.now());
+
+        // 3. Upload da Imagem (se existir arquivo)
+        if (file != null && !file.isEmpty()) {
+            String imageUrl = FileUploadUtil.saveFile(file);
+            group.setImageUrl(imageUrl);
         }
 
-        // 3. Persistir o objeto
-        return groupRepository.save(groupData);
+        // 4. Persistir no banco
+        return groupRepository.save(group);
     }
-
 
     /**
      * Lista todos os grupos públicos.
@@ -67,7 +74,7 @@ public class GroupService {
     }
 
     /**
-     * 🆕 NOVO MÉTODO: Atualiza apenas a URL da imagem do grupo no banco de dados.
+     * Atualiza apenas a URL da imagem do grupo no banco de dados.
      */
     @Transactional
     public Group updateImageUrl(Long groupId, String imageUrl) {
