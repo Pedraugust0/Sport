@@ -9,7 +9,7 @@ import GroupInfoScreen from "./components/groupInfoScreen";
 import CreateGroupModal from "./components/createGroupModal";
 import ChatScreen from "./components/chatScreen";
 import Login from "./components/login";
-import Notification from "./components/notification"; // 🔑 Importar o componente Notification
+import Notification from "./components/notification";
 
 // Serviços
 import { createGroup, getGroups } from "./services/groupsService";
