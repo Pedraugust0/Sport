@@ -14,7 +14,7 @@ Para garantir que o projeto funcione corretamente, você precisará ter o seguin
 
 * **Node.js** (Versão **16** ou superior)
 * **npm** ou **yarn** (para o Front-end)
-* **Java Development Kit (JDK)** (Versão **11** para o Back-end)
+* **Java Development Kit (JDK)** (Versão **21** para o Back-end)
 * **IntelliJ IDEA** (IDE que facilita o uso do maven, obs: pode ser outra IDE)
 * **Docker** e **Docker Compose** (Para rodar o Back-end e Banco de Dados facilmente)
 
