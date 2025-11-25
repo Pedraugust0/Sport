@@ -31,8 +31,15 @@ Para garantir que o projeto funcione corretamente, você precisará ter o seguin
 
 ### Back-end
 
-* **Spring Boot** (Java)
-* **Maven** (Gerenciamento de dependências)
+* **Spring Boot**: Framework principal para agilizar o desenvolvimento.
+* **Spring Web**: Construção de APIs RESTful.
+* **Spring Security**: Gerenciamento de autenticação e controle de acesso.
+* **Spring Data JPA**: Persistência de dados e integração SQL.
+* **Spring WebSocket**: Comunicação em tempo real (utilizado no Chat).
+* **MySQL**: Banco de dados relacional principal.
+* **H2 Database**: Banco de dados em memória (para testes rápidos).
+* **Lombok**: Biblioteca para redução de boilerplate.
+* **Maven**: Gerenciamento de dependências e build do projeto.
 
 ---
 
