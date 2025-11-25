@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Smile, Clock, MapPin, Footprints } from 'lucide-react';
+// Importa os serviços de comentários
+import { getComments, createComment, addReaction, removeReaction } from '../services/commentService';
 
 const CheckinDetailModal = ({ isOpen, onClose, checkin, currentUser }) => {
   const [comment, setComment] = useState('');
@@ -9,31 +11,78 @@ const CheckinDetailModal = ({ isOpen, onClose, checkin, currentUser }) => {
 
   const availableEmojis = ['❤️', '💪', '🔥', '👏', '👍'];
 
-  const handleAddComment = (e) => {
-    e.preventDefault();
-    if (comment.trim()) {
-      setComments([
-        { 
-          id: Date.now(), 
-          user: {
-            name: currentUser?.name || 'Eu',
-            photoUrl: currentUser?.photoUrl
-          }, 
-          text: comment, 
-          time: 'Agora' 
-        },
-        ...comments,
-      ]);
-      setComment('');
+  // 🆕 Carregar comentários ao abrir o modal
+  useEffect(() => {
+    if (isOpen && checkin && checkin.id) {
+      loadComments();
+    } else {
+      setComments([]);
+      setReactions({});
+    }
+  }, [isOpen, checkin]);
+
+  const loadComments = async () => {
+    try {
+      const apiComments = await getComments(checkin.id);
+      
+      // Filtrar comentários de texto
+      const textComments = apiComments
+        .filter(c => c.content != null)
+        .map(c => ({
+            id: c.id,
+            text: c.content,
+            time: new Date(c.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+            user: c.user
+        }));
+      setComments(textComments);
+
+      // Processar reações
+      const reactionsMap = {};
+      apiComments.filter(c => c.reactionEmoji != null).forEach(c => {
+          reactionsMap[c.reactionEmoji] = (reactionsMap[c.reactionEmoji] || 0) + 1;
+      });
+      setReactions(reactionsMap);
+
+    } catch (error) {
+      console.error("Erro ao carregar comentários", error);
     }
   };
 
-  const handleReaction = (emoji) => {
-    setReactions({
-      ...reactions,
-      [emoji]: (reactions[emoji] || 0) + 1,
-    });
-    setShowEmojiPicker(false);
+  const handleAddComment = async (e) => {
+    e.preventDefault();
+    if (!comment.trim()) return;
+
+    try {
+      // Envia para API
+      await createComment(comment, checkin.id, currentUser.id);
+      setComment('');
+      // Recarrega para mostrar o novo
+      loadComments();
+    } catch (error) {
+      alert("Erro ao comentar: " + error.message);
+    }
+  };
+
+  const handleReaction = async (emoji) => {
+    try {
+      // Tenta adicionar (se já existir, o backend pode dar erro ou ignorar)
+      // Aqui simplificado: tentamos adicionar. Se der erro, tentamos remover (toggle)
+      // Idealmente o backend retornaria se foi adicionado ou removido.
+      
+      // Vamos assumir adição por enquanto para simplicidade visual
+      await addReaction(emoji, checkin.id, currentUser.id);
+      loadComments();
+      setShowEmojiPicker(false);
+    } catch (error) {
+        // Se falhar (ex: já existe), tentamos remover
+        try {
+            await removeReaction(emoji, checkin.id, currentUser.id);
+            loadComments();
+            setShowEmojiPicker(false);
+        } catch (e) {
+            console.error("Erro ao reagir", e);
+        }
+    }
   };
 
   if (!isOpen || !checkin) return null;
@@ -94,24 +143,24 @@ const CheckinDetailModal = ({ isOpen, onClose, checkin, currentUser }) => {
               <p className="text-gray-700 mb-3">{checkin.description}</p>
             )}
 
-            {(checkin.metrics?.duration || checkin.metrics?.distance || checkin.metrics?.steps) && (
+            {(checkin.metrics?.distance || checkin.metrics?.duration || checkin.metrics?.steps) && (
               <div className="flex items-center gap-2 flex-wrap">
-                {checkin.metrics.duration && (
+                {checkin.metrics.duration > 0 && (
                   <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-full">
                     <Clock className="w-5 h-5" style={{ color: '#2E67D3' }} />
-                    <span className="text-sm font-medium" style={{ color: '#212121' }}>{checkin.metrics.duration}</span>
+                    <span className="text-sm font-medium" style={{ color: '#212121' }}>{checkin.metrics.duration} min</span>
                   </div>
                 )}
-                {checkin.metrics.distance && (
+                {checkin.metrics.distance > 0 && (
                   <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-full">
                     <MapPin className="w-5 h-5" style={{ color: '#2E67D3' }} />
-                    <span className="text-sm font-medium" style={{ color: '#212121' }}>{checkin.metrics.distance}</span>
+                    <span className="text-sm font-medium" style={{ color: '#212121' }}>{checkin.metrics.distance} km</span>
                   </div>
                 )}
-                {checkin.metrics.steps && (
+                {checkin.metrics.steps > 0 && (
                   <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-full">
                     <Footprints className="w-5 h-5" style={{ color: '#2E67D3' }} />
-                    <span className="text-sm font-medium" style={{ color: '#212121' }}>{checkin.metrics.steps}</span>
+                    <span className="text-sm font-medium" style={{ color: '#212121' }}>{checkin.metrics.steps} passos</span>
                   </div>
                 )}
               </div>

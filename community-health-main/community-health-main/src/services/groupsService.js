@@ -35,10 +35,13 @@ export async function createGroup(groupData) {
 }
 
 /**
- * Busca todos os grupos do banco de dados.
+ * 🆕 Busca grupos filtrados pelo usuário logado
  */
-export async function getGroups() {
-    const res = await fetch(API_URL);
+export async function getGroups(userId) {
+    // Monta a URL: /api/groups?userId=123
+    const url = userId ? `${API_URL}?userId=${userId}` : API_URL;
+    
+    const res = await fetch(url);
     if (!res.ok) throw new Error("Erro ao buscar grupos.");
     return res.json();
 }

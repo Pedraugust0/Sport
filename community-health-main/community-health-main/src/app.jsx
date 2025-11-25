@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Sidebar from "./components/sidebar";
 import GroupHeader from "./components/groupHeader";
 import ActivityFeed from "./components/activityFeed";
@@ -9,16 +9,33 @@ import GroupInfoScreen from "./components/groupInfoScreen";
 import CreateGroupModal from "./components/createGroupModal";
 import ChatScreen from "./components/chatScreen";
 import Login from "./components/login";
+import Notification from "./components/notification"; // 🔑 Importar o componente Notification
 
 // Serviços
 import { createGroup, getGroups } from "./services/groupsService";
-
-// Imagens Mock (fallback)
-import paisagemPhoto from "./imagens/Paissagem.jpg";
+import { createCheckin, getCheckinsByGroup } from "./services/checkinsService"; 
 
 function App() {
-  // --- GESTÃO DE USUÁRIO ---
   const [currentUser, setCurrentUser] = useState(null);
+
+  // 🔑 ESTADO E LÓGICA DA NOTIFICAÇÃO
+  const [notification, setNotification] = useState(null);
+
+  // Função central para exibir a notificação
+  const showNotification = (type, message, user, time = 'Agora') => {
+    // Para garantir que a notificação desapareça após 4 segundos
+    if (notificationTimeout.current) {
+        clearTimeout(notificationTimeout.current);
+    }
+    
+    setNotification({ type, message, user, time });
+
+    notificationTimeout.current = setTimeout(() => {
+        setNotification(null);
+    }, 4000); 
+  };
+  const notificationTimeout = useRef(null);
+  // FIM DA LÓGICA DA NOTIFICAÇÃO
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -37,26 +54,11 @@ function App() {
     setCurrentUser(null);
   };
 
-  // --- ESTADOS ---
-  const mockGroups = [
-    { id: 'mock1', name: "Exemplo Local", active: true, image: paisagemPhoto, duration: 30 },
-  ];
+  const [groups, setGroups] = useState([]);
+  const [currentGroup, setCurrentGroup] = useState(null);
+  const [currentGroupData, setCurrentGroupData] = useState(null);
+  const [activities, setActivities] = useState([]); 
 
-  const [groups, setGroups] = useState(mockGroups);
-  
-  // Estado do grupo selecionado e seus dados detalhados
-  const [currentGroup, setCurrentGroup] = useState(mockGroups[0]);
-  const [currentGroupData, setCurrentGroupData] = useState({
-    id: 'mock1',
-    name: "Exemplo Local",
-    image: paisagemPhoto,
-    totalDuration: 30,
-    daysRemaining: 30,
-    myCheckins: 0,
-    leader: { name: "Sistema", checkins: 0 },
-  });
-
-  const [activities, setActivities] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedCheckin, setSelectedCheckin] = useState(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -64,67 +66,39 @@ function App() {
   const [isCreateGroupModalOpen, setIsCreateGroupModalOpen] = useState(false);
   const [showChat, setShowChat] = useState(false);
 
-  // 🆕 CARREGAR GRUPOS DO BACKEND AO INICIAR
-  useEffect(() => {
-    if (currentUser) {
-      loadGroupsFromApi();
-    }
-  }, [currentUser]);
+  // --- FUNÇÕES AUXILIARES (Definidas ANTES do useEffect) ---
 
-  const loadGroupsFromApi = async () => {
+  const loadCheckinsFromApi = async (groupId) => {
     try {
-      const apiGroups = await getGroups();
+      const apiCheckins = await getCheckinsByGroup(groupId);
       
-      if (apiGroups && apiGroups.length > 0) {
-        // Mapeia para garantir que os campos batam com o front
-        const formattedGroups = apiGroups.map(g => ({
-          id: g.id,
-          name: g.name,
-          // Backend manda "imageUrl", Frontend usa "image"
-          image: g.imageUrl || null, 
-          // Backend manda "durationDays", Frontend usa "duration" ou "totalDuration"
-          totalDuration: g.durationDays || 30,
-          daysRemaining: g.daysRemaining || 30,
-          // Se não tiver leader definido ainda
-          leader: g.owner ? { name: g.owner.name, checkins: 0 } : { name: "Líder", checkins: 0 }
-        }));
+      const formattedCheckins = apiCheckins.map(c => ({
+        id: c.id,
+        date: new Date(c.createdAt).toLocaleDateString('pt-BR'), 
+        time: new Date(c.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        activity: c.tituloAtividade,
+        description: c.descricao,
+        photo: c.photoUrl,
+        metrics: {
+            distance: c.metricas?.distanciaKm,
+            duration: c.metricas?.duracaoMin,
+            steps: c.metricas?.passos
+        },
+        user: c.user,
+        userPhoto: c.user.photoUrl
+      })).reverse(); 
 
-        setGroups(formattedGroups);
-        // Seleciona o primeiro grupo da lista real
-        handleGroupChange(formattedGroups[0]);
-      }
+      setActivities(formattedCheckins);
     } catch (error) {
-      console.error("Erro ao carregar grupos:", error);
+      console.error("Erro ao carregar check-ins:", error);
+      showNotification('error', 'Falha ao carregar atividades.', currentUser?.name);
     }
-  };
-
-  // --- FUNÇÕES ---
-
-  const handleNewCheckin = (data) => {
-    const now = new Date();
-    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-
-    const newCheckin = {
-      id: Date.now(),
-      date: "Hoje",
-      user: { 
-        name: currentUser.name,
-        photoUrl: currentUser.photoUrl 
-      },
-      activity: data.title,
-      description: data.description || "",
-      time: currentTime,
-      photo: data.photo ? URL.createObjectURL(data.photo) : null,
-      metrics: data,
-    };
-    setActivities([newCheckin, ...activities]);
   };
 
   const handleGroupChange = (group) => {
     if (!group) return;
     setCurrentGroup(group);
 
-    // Atualiza os dados detalhados do grupo atual
     setCurrentGroupData({
       id: group.id,
       name: group.name,
@@ -135,54 +109,90 @@ function App() {
       leader: group.leader || { name: currentUser?.name || "Alguém", checkins: 0 },
     });
 
-    setActivities([]);
     setShowGroupInfo(false);
     setShowChat(false);
+    
+    loadCheckinsFromApi(group.id);
   };
 
-  // 🆕 CRIAÇÃO DE GRUPO CONECTADA AO BACKEND
-  const handleCreateGroup = async (data) => {
+  const loadGroupsFromApi = async (userId) => {
     try {
-      // Prepara o payload adicionando o ID do dono
-      const payload = {
-        ...data,
-        ownerId: currentUser.id // Necessário para o backend
-      };
-
-      // 1. Chama o serviço para salvar no banco
-      const savedGroup = await createGroup(payload);
-
-      // 2. Formata o objeto retornado do Java para o formato do React
-      const newGroupFormatted = {
-        id: savedGroup.id,
-        name: savedGroup.name,
-        image: savedGroup.imageUrl,
-        totalDuration: savedGroup.durationDays,
-        daysRemaining: savedGroup.durationDays, // Acabou de criar
-        leader: { name: currentUser.name, checkins: 0 }
-      };
-
-      // 3. Atualiza a lista localmente
-      const updatedGroups = [...groups, newGroupFormatted];
-      setGroups(updatedGroups);
+      const apiGroups = await getGroups(userId);
       
-      // 4. Muda para o novo grupo
-      handleGroupChange(newGroupFormatted);
+      if (apiGroups && apiGroups.length > 0) {
+        const formattedGroups = apiGroups.map(g => ({
+          id: g.id,
+          name: g.name,
+          image: g.imageUrl || null, 
+          totalDuration: g.durationDays || 30,
+          daysRemaining: g.daysRemaining || 30,
+          leader: g.owner ? { name: g.owner.name, checkins: 0 } : { name: "Líder", checkins: 0 }
+        }));
 
-      alert("Grupo criado com sucesso!");
+        setGroups(formattedGroups);
+        
+        if (!currentGroup || !formattedGroups.find(g => g.id === currentGroup.id)) {
+            handleGroupChange(formattedGroups[0]);
+        }
+      } else {
+        setGroups([]);
+        setCurrentGroup(null);
+        setCurrentGroupData(null);
+      }
     } catch (error) {
-      console.error(error);
-      alert("Erro ao criar grupo: " + error.message);
+      console.error("Erro ao carregar grupos:", error);
+      showNotification('error', 'Falha ao carregar seus grupos.', currentUser?.name);
     }
   };
 
-  // --- RENDERIZAÇÃO ---
+  // --- USE EFFECTS ---
+
+  useEffect(() => {
+    if (currentUser) {
+      loadGroupsFromApi(currentUser.id);
+    }
+  }, [currentUser]);
+
+  // --- HANDLERS ---
+
+  const handleNewCheckin = async (data) => {
+    try {
+      if (!currentGroup) return;
+      await createCheckin(data, currentGroup.id, currentUser.id);
+      
+      // Notificação de sucesso
+      showNotification('checkin', `Novo check-in publicado: ${data.title}`, currentUser.name); 
+      
+      await loadCheckinsFromApi(currentGroup.id);
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error(error);
+      showNotification('error', `Erro ao criar check-in: ${error.message}`, currentUser.name); 
+    }
+  };
+
+  const handleCreateGroup = async (data) => {
+    try {
+      const payload = { ...data, ownerId: currentUser.id };
+      await createGroup(payload); 
+      
+      showNotification('member', `O grupo "${data.name}" foi criado!`, currentUser.name);
+      
+      loadGroupsFromApi(currentUser.id);
+      setIsCreateGroupModalOpen(false);
+    } catch (error) {
+      console.error(error);
+      showNotification('error', `Erro ao criar grupo: ${error.message}`, currentUser.name); 
+    }
+  };
+
+  // --- RENDER ---
 
   if (!currentUser) {
     return (
       <div className="grid grid-cols-1 h-screen bg-blue-400">
         <div className="flex items-center justify-center h-auto">
-          <Login onLogin={handleLogin} />
+          <Login onLogin={handleLogin} showNotification={showNotification} /> {/* 🔑 Passando Notificação */}
         </div>
       </div>
     );
@@ -199,12 +209,24 @@ function App() {
         onLogout={handleLogout}
       />
 
-      {showGroupInfo ? (
+      {/* 🔑 Renderiza a Notificação se houver estado */}
+      {notification && (
+        <Notification
+            type={notification.type}
+            message={notification.message}
+            user={notification.user}
+            time={notification.time}
+            onClose={() => clearTimeout(notificationTimeout.current) & setNotification(null)}
+        />
+      )}
+      {/* FIM DA NOTIFICAÇÃO */}
+
+      {showGroupInfo && currentGroupData ? (
         <GroupInfoScreen 
           group={currentGroupData} 
           onBack={() => setShowGroupInfo(false)} 
         />
-      ) : showChat ? (
+      ) : showChat && currentGroupData ? (
         <ChatScreen 
           currentUser={currentUser}
           group={currentGroupData} 
@@ -212,26 +234,35 @@ function App() {
         />
       ) : (
         <main className="flex-1 ml-80 p-8 overflow-y-auto">
-          <GroupHeader
-            currentUser={currentUser}
-            group={currentGroupData}
-            onShowInfo={() => setShowGroupInfo(true)}
-            onImageChange={(img) =>
-              setCurrentGroupData({ ...currentGroupData, image: img })
-            }
-          />
+          {currentGroupData ? (
+            <>
+              <GroupHeader
+                currentUser={currentUser}
+                group={currentGroupData}
+                onShowInfo={() => setShowGroupInfo(true)}
+                onImageChange={(img) =>
+                  setCurrentGroupData({ ...currentGroupData, image: img })
+                }
+              />
 
-          <ActivityFeed 
-            activities={activities} 
-            onCheckinClick={(checkin) => {
-              setSelectedCheckin(checkin);
-              setIsDetailModalOpen(true);
-            }} 
-          />
+              <ActivityFeed 
+                activities={activities} 
+                onCheckinClick={(checkin) => {
+                  setSelectedCheckin(checkin);
+                  setIsDetailModalOpen(true);
+                }} 
+              />
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-gray-500">
+              <p className="text-xl">Você ainda não tem grupos.</p>
+              <p>Crie um novo grupo para começar!</p>
+            </div>
+          )}
         </main>
       )}
 
-      {!showGroupInfo && !showChat && (
+      {!showGroupInfo && !showChat && currentGroupData && (
         <FloatingButton
           onClick={() => setIsModalOpen(true)}
           onChatClick={() => setShowChat(true)}

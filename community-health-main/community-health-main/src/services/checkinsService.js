@@ -1,33 +1,61 @@
-// CRUD DE CHECK-INS
+const API_URL = "http://localhost:8080/api/checkins";
 
-export function createCheckin(checkinData) {
-  const checkins = JSON.parse(localStorage.getItem("checkins")) || [];
+/**
+ * 1. Faz o upload da foto (se houver).
+ * 2. Cria o check-in vinculando ao Grupo e ao Usuário.
+ */
+export async function createCheckin(checkinData, groupId, userId) {
+    let photoUrl = null;
 
-  const newCheckin = {
-    id: Date.now(),
-    date: new Date().toISOString(),
-    ...checkinData,
-  };
+    // Passo A: Upload da imagem (se o usuário selecionou uma)
+    if (checkinData.photoFile) {
+        const formData = new FormData();
+        formData.append("file", checkinData.photoFile);
 
-  checkins.push(newCheckin);
-  localStorage.setItem("checkins", JSON.stringify(checkins));
+        const uploadRes = await fetch(`${API_URL}/upload`, {
+            method: "POST",
+            body: formData,
+        });
 
-  return newCheckin;
+        if (!uploadRes.ok) throw new Error("Erro ao fazer upload da foto.");
+        photoUrl = await uploadRes.text(); // O backend retorna a URL como string
+    }
+
+    // Passo B: Criar o objeto JSON do Checkin
+    const payload = {
+        tituloAtividade: checkinData.title,
+        descricao: checkinData.description,
+        photoUrl: photoUrl,
+        metricas: {
+            distanciaKm: parseFloat(checkinData.distance) || 0,
+            duracaoMin: parseInt(checkinData.duration) || 0,
+            passos: parseInt(checkinData.steps) || 0
+        }
+    };
+
+    // Passo C: Enviar para o Backend
+    // URL: POST /api/checkins?groupId=1&userId=2
+    const res = await fetch(`${API_URL}?groupId=${groupId}&userId=${userId}`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || "Erro ao criar check-in.");
+    }
+
+    return res.json();
 }
 
-export function getCheckins() {
-  return JSON.parse(localStorage.getItem("checkins")) || [];
-}
-
-export function getCheckinsByGroup(groupId) {
-  const checkins = JSON.parse(localStorage.getItem("checkins")) || [];
-  return checkins.filter(c => c.groupId == groupId);
-}
-
-export function deleteCheckin(id) {
-  let checkins = JSON.parse(localStorage.getItem("checkins")) || [];
-
-  checkins = checkins.filter(c => c.id !== id);
-  localStorage.setItem("checkins", JSON.stringify(checkins));
-  return true;
+/**
+ * Busca todos os check-ins de um grupo específico.
+ */
+export async function getCheckinsByGroup(groupId) {
+    const res = await fetch(`${API_URL}?groupId=${groupId}`);
+    if (!res.ok) throw new Error("Erro ao buscar check-ins.");
+    return res.json();
 }

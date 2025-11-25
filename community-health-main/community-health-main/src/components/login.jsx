@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { loginUser, registerUser } from '../services/authService.js';
 import { getUserByEmail } from '../services/usersService.js';
 
-const Login = ({ onLogin }) => {
+const Login = ({ onLogin, showNotification }) => { // 🔑 Recebe showNotification
   const [isRegistering, setIsRegistering] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -34,29 +34,28 @@ const Login = ({ onLogin }) => {
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
     if (!registerData.email || !registerData.senha || !registerData.nome) {
-      alert("Preencha todos os campos obrigatórios!");
+      showNotification('error', 'Preencha todos os campos obrigatórios!', 'Erro de Cadastro'); // 🔑 Notificação
       return;
     }
     setLoading(true);
 
     try {
       await registerUser(registerData); 
-      alert("✅ Conta criada com sucesso! Faça login.");
+      showNotification('member', 'Conta criada com sucesso! Faça login.', 'Sucesso!'); // 🔑 Notificação
       resetForm();
       setIsRegistering(false);
     } catch (error) {
-      alert(`❌ Falha no cadastro: ${error.message}`);
+      showNotification('error', `Falha no cadastro: ${error.message}`, 'Erro!'); // 🔑 Notificação
     } finally {
       setLoading(false);
     }
   };
 
-  // 🔹 AQUI ESTÁ A CORREÇÃO PRINCIPAL
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
     
     if (!loginEmail || !loginSenha) {
-        alert("Preencha todos os campos!");
+        showNotification('error', 'Preencha todos os campos!', 'Erro de Login'); // 🔑 Notificação
         return;
     }
 
@@ -67,7 +66,6 @@ const Login = ({ onLogin }) => {
       await loginUser(loginEmail, loginSenha);
 
       // 2. Busca os dados completos do usuário usando o email
-      // (Isso recupera o nome, foto, id, etc. para exibir no painel)
       const userDetails = await getUserByEmail(loginEmail);
 
       resetForm();
@@ -77,7 +75,7 @@ const Login = ({ onLogin }) => {
 
     } catch (error) {
       console.error(error);
-      alert(`❌ Falha no login: ${error.message}`);
+      showNotification('error', `Falha no login: Verifique seu e-mail e senha.`, 'Erro!'); // 🔑 Notificação
     } finally {
       setLoading(false);
     }

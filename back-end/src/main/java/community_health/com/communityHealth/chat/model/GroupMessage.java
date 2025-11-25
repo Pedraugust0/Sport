@@ -29,7 +29,7 @@ public class GroupMessage {
 
     // 🔑 CORREÇÃO: Ignora as coleções Lazy dentro de User para evitar o erro específico:
     // User.memberships (e outras como checkins ou groups_owned)
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "sender_id", nullable = false)
     @JsonIgnoreProperties({"memberships", "checkins", "ownedGroups"}) // Ajuste os nomes das coleções do User aqui
     private User sender;
