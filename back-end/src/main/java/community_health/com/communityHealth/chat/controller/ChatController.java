@@ -1,13 +1,11 @@
-// src/main/java/community_health/com/communityHealth/chat/controller/ChatController.java
-
 package community_health.com.communityHealth.chat.controller;
 
 import community_health.com.communityHealth.chat.model.GroupMessage;
 import community_health.com.communityHealth.chat.repository.GroupMessageRepository;
 import community_health.com.communityHealth.group.model.Group;
 import community_health.com.communityHealth.group.repository.GroupRepository;
-import community_health.com.communityHealth.usuario.model.User;
-import community_health.com.communityHealth.usuario.repository.UserRepository;
+import community_health.com.communityHealth.user.model.User;
+import community_health.com.communityHealth.user.repository.UserRepository;
 
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -23,13 +21,11 @@ import java.util.List;
 @Controller
 public class ChatController {
 
-    // DECLARAÇÃO DOS CAMPOS (FINAL FIELDS)
     private final SimpMessageSendingOperations messagingTemplate;
     private final GroupMessageRepository messageRepository;
     private final UserRepository userRepository;
     private final GroupRepository groupRepository;
 
-    // CONSTRUTOR DE INJEÇÃO DE DEPENDÊNCIA
     public ChatController(SimpMessageSendingOperations messagingTemplate,
                           GroupMessageRepository messageRepository,
                           UserRepository userRepository,
@@ -40,43 +36,45 @@ public class ChatController {
         this.groupRepository = groupRepository;
     }
 
-    // RECEBE MENSAGENS DO CLIENTE (STOMP SEND para /app/group/{groupId})
+    // STOMP SEND para /app/group/{groupId}
     @MessageMapping("/group/{groupId}")
     public void sendGroupMessage(@DestinationVariable Long groupId, @Payload GroupMessage message) {
 
-        Long currentUserId = 1L; // EXEMPLO: ID é Long (Correto para este controller)
+        // 1. Obter o ID do remetente que veio no JSON (message.sender.id)
+        if (message.getSender() == null || message.getSender().getId() == null) {
+            throw new RuntimeException("Remetente (senderId) é obrigatório.");
+        }
+        Long senderId = message.getSender().getId();
 
-        // 1. Busca as entidades
-        // 🔑 Linha 58 (userRepository.findById(currentUserId))
-        User sender = userRepository.findById(currentUserId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado: " + currentUserId));
+        // 2. Buscar entidades no banco
+        User sender = userRepository.findById(senderId)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado: " + senderId));
 
-        // 🔑 Linha 61 (groupRepository.findById(groupId))
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new RuntimeException("Grupo não encontrado: " + groupId));
 
-
-        // 2. Preenche o objeto
+        // 3. Preencher e Salvar
         message.setSender(sender);
         message.setGroup(group);
 
-        // 3. Salva a mensagem no banco
+        // Define data se não vier preenchida (opcional, pois @CreationTimestamp resolve no banco,
+        // mas para o retorno imediato do socket é bom ter)
+        if (message.getCreatedAt() == null) {
+            message.setCreatedAt(java.time.LocalDateTime.now());
+        }
+
         GroupMessage savedMessage = messageRepository.save(message);
 
-        // 4. Envia para o BROKER
+        // 4. Enviar para todos os inscritos no tópico do grupo
         messagingTemplate.convertAndSend("/topic/group/" + groupId, savedMessage);
     }
 
-    // Endpoint REST para buscar o histórico (HTTP GET)
     @GetMapping("/api/v1/groups/{groupId}/chat/messages")
     @ResponseBody
     public List<GroupMessage> getChatHistory(@PathVariable Long groupId) {
-
-        // 1. Busca a entidade Group
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new RuntimeException("Grupo não encontrado: " + groupId));
 
-        // 2. Retorna a lista de mensagens para o grupo
         return messageRepository.findByGroupOrderByCreatedAtAsc(group);
     }
 }

@@ -2,18 +2,21 @@ package community_health.com.communityHealth.group.repository;
 
 import community_health.com.communityHealth.group.model.Group;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query; // 🆕 Import necessário
+import org.springframework.data.repository.query.Param; // 🆕 Import necessário
 import org.springframework.stereotype.Repository;
-
 
 import java.util.List;
 
 @Repository
-public interface GroupRepository extends JpaRepository<Group, Long> { // <-- CORREÇÃO APLICADA AQUI
+public interface GroupRepository extends JpaRepository<Group, Long> {
 
-    // Exemplo: Encontrar todos os grupos que não são privados
+    // Seus métodos existentes (pode manter):
     List<Group> findByIsPrivateFalse();
-
-    // Exemplo: Encontrar grupos pelo ID do Owner (Long)
-    // O ID do Owner é Long, então este método está correto:
     List<Group> findByOwnerId(Long ownerId);
+
+    @Query("SELECT DISTINCT g FROM Group g " +
+            "LEFT JOIN g.members m " +
+            "WHERE g.owner.id = :userId OR m.user.id = :userId")
+    List<Group> findMyGroups(@Param("userId") Long userId);
 }

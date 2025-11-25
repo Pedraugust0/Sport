@@ -1,21 +1,23 @@
 package community_health.com.communityHealth.group.controller;
 
 import community_health.com.communityHealth.group.dto.RankingDto;
+import community_health.com.communityHealth.group.dto.GroupStatsDto; // 🔑 Importe o DTO
 import community_health.com.communityHealth.group.model.Group;
+import community_health.com.communityHealth.group.model.GroupMember;
 import community_health.com.communityHealth.group.service.GroupService;
 import community_health.com.communityHealth.utils.FileUploadUtil;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
 import java.io.IOException;
 import java.util.List;
 
-// 🔑 NOVO: DTO simples para receber a URL do JSON (necessário para PUT/PATCH)
 record ImageUpdateDto(String imageUrl) {}
-
 
 @RestController
 @RequestMapping("/api/groups")
@@ -29,82 +31,43 @@ public class GroupController {
     }
 
     /**
-     * Endpoint para criar um novo grupo (Dados JSON).
-     * POST /api/groups?ownerId={ownerId}
+     * POST /api/groups
+     * Cria grupo com imagem
      */
-    @PostMapping
-    public ResponseEntity<Group> createGroup(
-            @RequestBody Group groupData,
-            @RequestParam Long ownerId) {
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> createGroup(
+            @RequestParam("name") String name,
+            @RequestParam(value = "description", required = false) String description,
+            @RequestParam("duration") Integer duration,
+            @RequestParam("isPrivate") Boolean isPrivate,
+            @RequestParam("ownerId") Long ownerId,
+            @RequestParam(value = "file", required = false) MultipartFile file
+    ) {
         try {
-            Group newGroup = groupService.createGroup(groupData, ownerId);
-            return new ResponseEntity<>(newGroup, HttpStatus.CREATED); // Retorna 201 Created
-        } catch (EntityNotFoundException e) {
-            // Se o Owner não for encontrado
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST); // Retorna 400 Bad Request
-        }
-    }
-
-    /**
-     * 🆕 NOVO ENDPOINT: Atualiza a URL da imagem de um grupo existente.
-     * Mapeado para: PUT /api/groups/{groupId}/image
-     */
-    @PutMapping("/{groupId}/image")
-    public ResponseEntity<Group> updateGroupImage(
-            @PathVariable Long groupId,
-            @RequestBody ImageUpdateDto imageUpdateDto) { // Recebe o DTO com a nova URL
-        try {
-            // Chama o serviço para atualizar a URL (o GroupService deve conter a lógica de salvar)
-            Group updatedGroup = groupService.updateImageUrl(groupId, imageUpdateDto.imageUrl());
-            return ResponseEntity.ok(updatedGroup); // Retorna 200 OK com o grupo atualizado
-        } catch (EntityNotFoundException e) {
-            // Se o grupo não for encontrado, retorna 404
-            return ResponseEntity.notFound().build();
+            Group newGroup = groupService.createGroupWithImage(name, description, duration, isPrivate, ownerId, file);
+            return new ResponseEntity<>(newGroup, HttpStatus.CREATED);
         } catch (Exception e) {
-            System.err.println("Erro ao atualizar foto do grupo: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            return ResponseEntity.badRequest().body("Erro ao criar grupo: " + e.getMessage());
         }
     }
 
-
     /**
-     * 🆕 NOVO ENDPOINT: Faz o upload da imagem do grupo e retorna a URL pública.
-     * Recebe a requisição MultiPart do frontend ANTES da criação final do grupo.
-     * URL: POST /api/groups/upload
-     */
-    @PostMapping("/upload")
-    public ResponseEntity<String> uploadGroupImage(@RequestParam("file") MultipartFile file) {
-        if (file.isEmpty()) {
-            return new ResponseEntity<>("Arquivo vazio.", HttpStatus.BAD_REQUEST);
-        }
-
-        try {
-            // 🔑 Salva o arquivo no disco e obtém a URL pública (usando a classe utilitária)
-            String imageUrl = FileUploadUtil.saveFile(file);
-
-            // Retorna a URL para o frontend.
-            return new ResponseEntity<>(imageUrl, HttpStatus.OK);
-
-        } catch (IOException e) {
-            System.err.println("Erro ao salvar arquivo de imagem: " + e.getMessage());
-            return new ResponseEntity<>("Falha ao salvar a imagem. Erro: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
-
-
-    /**
-     * Endpoint para listar todos os grupos.
      * GET /api/groups
      */
     @GetMapping
-    public ResponseEntity<List<Group>> getAllGroups() {
-        List<Group> publicGroups = groupService.findAllGroups();
-        return new ResponseEntity<>(publicGroups, HttpStatus.OK);
+    public ResponseEntity<List<Group>> getGroups(@RequestParam(required = false) Long userId) {
+        if (userId != null) {
+            // Retorna meus grupos (dono ou membro)
+            return ResponseEntity.ok(groupService.findGroupsForUser(userId));
+        }
+
+        // Retorna lista vazia
+        return ResponseEntity.ok(List.of());
     }
 
     /**
-     * Endpoint: Busca a classificação e estatísticas de um grupo.
      * GET /api/groups/{groupId}/ranking
+     * Retorna a lista de RankingDto (Estatísticas por membro)
      */
     @GetMapping("/{groupId}/ranking")
     public ResponseEntity<List<RankingDto>> getGroupRanking(@PathVariable Long groupId) {
@@ -113,6 +76,67 @@ public class GroupController {
             return ResponseEntity.ok(ranking);
         } catch (Exception e) {
             System.err.println("Erro ao buscar ranking: " + e.getMessage());
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @PutMapping("/{groupId}/image")
+    public ResponseEntity<Group> updateGroupImage(
+            @PathVariable Long groupId,
+            @RequestBody ImageUpdateDto imageUpdateDto) {
+        try {
+            Group updatedGroup = groupService.updateImageUrl(groupId, imageUpdateDto.imageUrl());
+            return ResponseEntity.ok(updatedGroup);
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @PostMapping("/upload")
+    public ResponseEntity<String> uploadGroupImage(@RequestParam("file") MultipartFile file) {
+        if (file.isEmpty()) {
+            return new ResponseEntity<>("Arquivo vazio.", HttpStatus.BAD_REQUEST);
+        }
+        try {
+            String imageUrl = FileUploadUtil.saveFile(file);
+            return new ResponseEntity<>(imageUrl, HttpStatus.OK);
+        } catch (IOException e) {
+            return new ResponseEntity<>("Falha ao salvar a imagem: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * 🔑 NOVO ENDPOINT: GET /api/groups/{groupId}/members
+     * Retorna a lista de GroupMember, que o frontend espera para a classificação.
+     */
+    @GetMapping("/{groupId}/members")
+    public ResponseEntity<List<GroupMember>> getGroupMembers(@PathVariable Long groupId) {
+        try {
+            List<GroupMember> members = groupService.findGroupMembersByGroupId(groupId);
+            return ResponseEntity.ok(members);
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            System.err.println("Erro ao buscar membros: " + e.getMessage());
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * 🔑 NOVO ENDPOINT: GET /api/groups/{groupId}/stats
+     * Retorna o DTO de estatísticas globais do grupo.
+     */
+    @GetMapping("/{groupId}/stats")
+    public ResponseEntity<GroupStatsDto> getGroupStats(@PathVariable Long groupId) {
+        try {
+            GroupStatsDto stats = groupService.calculateGroupStats(groupId);
+            return ResponseEntity.ok(stats);
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            System.err.println("Erro ao buscar estatísticas: " + e.getMessage());
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }

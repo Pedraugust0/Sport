@@ -1,6 +1,6 @@
 package community_health.com.communityHealth.checkin.model;
 
-import community_health.com.communityHealth.usuario.model.User;
+import community_health.com.communityHealth.user.model.User;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
