@@ -6,7 +6,7 @@
 
 ## Conceito
     
-> Sistema web para unir pessoas e para práticas de esportes.
+> Sistema web mobile-first para unir pessoas na prática de esportes em geral (futebol, corrida, natação, vôlei, ciclismo, lutas, musculação e outros).
 
 ### **O que é:**
   1. Uma plataforma web focada em criar comprometimento e consistência através de um diário de treino compartilhado. O sistema utiliza a interação social para motivar os usuários a registrarem suas atividades físicas, utiliza os grupos para engajamento e uma construção de hábitos saudáveis.
@@ -21,8 +21,8 @@
 
 ### **Como se contabiliza o Check-In:**
   1. Para registrar sua atividade, o usuário clica em "Fazer Check-in".
-  2. O usuário informa qual atividade física ele praticou no dia.
-  3. O usuário descreve a atividade praticada. Ex: "Fiz 45 minutos de musculação, foco em costas e bíceps", ou "Corrida leve de 5km na orla".
+  2. O usuário informa qual esporte ou atividade ele praticou no dia.
+  3. O usuário descreve a atividade praticada. Ex: "Joguei 1h de futebol society com a galera", "Corrida leve de 5km na orla" ou "45 minutos de musculação, foco em costas e bíceps".
   4. O usuário opcionalmente informa uma foto comprovando a atividade praticada.
   5. Ao confirmar, o registro é publicado no feed do desafio.
       1. Os integrantes do grupo precisam avaliar o check-in publicado, precisando da aprovação de 60% dos integrantes do grupo para contabilizar, caso o contrário o check-in é descartado.
@@ -44,26 +44,32 @@
   6. Compartilhamento de check-ins em outras redes sociais com as informações detalhadas nele.
   7. Ranking Automatizado por Consistência: O sistema recompensa a frequência de registros, reforçando o hábito.
   8. Perfis de Usuário para Conexão: Uso de dados de esportes e localização para fortalecer a comunidade.
-  9. Acesso Web Universal: Funciona perfeitamente em qualquer navegador (computador ou celular), sem necessidade de apps.
+  9. Acesso Web Universal e Mobile-First: Projetado primeiro para o celular, funciona em qualquer navegador, sem necessidade de apps.
+  10. Chatbot Integrado: Assistente customizado para montar planos de treino e tirar dúvidas sobre esportes.
+  11. Atividades Gamificadas: Missões e conquistas para dar motivação extra.
 
 ### Diferencial
   1. Nosso diferencial é a criação de um espaço de c**ompromisso, livre de selfies vazias**. Valorizamos a **experiência real** descrita no seu check-in, tornando o registro rápido e inclusivo. No entanto, para garantir a consistência, ativamos o p**oder de veto do grupo**: o registro só pontua após a aprovação de 60% dos integrantes. O resultado é um **ambiente de apoio mútuo** focado na **transparência e na formação de hábitos**, e não na competição por cliques ou imagens.
         
 ## Especificações Técnicas
-### Linguagem Front-End
-  - Html
-  - Css
-  - Typescript
-      - Angular
-### Linguagem Back-End
-  - Java
-      - Spring-Boot
-          - Web
-          - JPA
-          - Validations
-          - Security
+### Front-End (mobile-first)
+  - Next.js (React)
+  - TypeScript
+  - HTML e CSS
+### Back-End principal
+  - Python
+      - FastAPI
+          - Pydantic (validação)
+          - SQLAlchemy (ORM)
+          - Autenticação com JWT
+### Chatbot
+  - Serviço integrado ao back-end, com prompts customizados
+  - Monta planos de treino e tira dúvidas sobre esportes
+  - Provedor de modelo de linguagem: a definir
+### Gamificação
+  - Atividades e missões para dar motivação (a detalhar)
 ### DBMS
   - Relacional
       - PostgreSQL
   - Não Relacional
-        - …
+      - A definir (se necessário)
