@@ -17,12 +17,9 @@ Projeto desenvolvido como **Projeto Integrador 2**.
 - [Como funciona](#como-funciona)
 - [Arquitetura](#arquitetura)
 - [Tecnologias](#tecnologias)
-- [Estrutura do repositório](#estrutura-do-repositório)
 - [Começando](#começando)
 - [Como contribuir](#como-contribuir)
 - [Documentação](#documentação)
-- [Status](#status)
-- [Autor](#autor)
 
 ---
 
@@ -91,27 +88,13 @@ O diferencial é um espaço de compromisso **sem selfies vazias**. O foco está 
 - Integração com modelo de linguagem via API (provedor a definir)
 
 > As escolhas acima refletem o estado atual do planejamento e podem mudar durante o desenvolvimento.
-
----
-
-## Estrutura do repositório
-
-```
-.
-├── back-end/      # API FastAPI (em desenvolvimento)
-├── docs/          # Documentação do projeto
-│   ├── ideia.md        # Conceito, funcionalidades e regras de negócio
-│   └── diagrama_er.md  # Modelo entidade-relacionamento
-└── README.md
-```
-
 ---
 
 ## Começando
 
 ### Pré-requisitos
 
-- **Node.js** 20+ e **npm** (ou **pnpm**/**yarn**) para o front-end
+- **Node.js** 20+ e **npm** para o front-end
 - **Python** 3.11+ para o back-end
 - **Docker** e **Docker Compose** para o banco de dados (quando disponível)
 - **Git**
@@ -147,10 +130,6 @@ npm run dev
 
 A aplicação ficará disponível em `http://localhost:3000`.
 
-### 4. Variáveis de ambiente
-
-Crie os arquivos `.env` a partir dos modelos de exemplo, quando existirem. Nunca versione credenciais.
-
 ---
 
 ## Como contribuir
@@ -165,23 +144,3 @@ Leia o [CONTRIBUTING.md](CONTRIBUTING.md) para ver o fluxo de branches, o padrã
 - [Diagrama entidade-relacionamento](docs/diagrama_er.md)
 
 ---
-
-## Status
-
-🚧 **Em desenvolvimento.** Próximas etapas:
-
-- [ ] Autenticação e perfil de usuário
-- [ ] Criação e gerenciamento de desafios em grupo
-- [ ] Check-in com aprovação do grupo
-- [ ] Ranking, feed e chat do desafio
-- [ ] Sistema de pontuação e ofensivas
-- [ ] Gamificação
-- [ ] Chatbot de planos e dúvidas
-- [ ] Compartilhamento de check-ins como imagem
-
----
-
-## Autor
-
-**Pedro Augusto** ([@Pedraugust0](https://github.com/Pedraugust0))
-Projeto Integrador 2
