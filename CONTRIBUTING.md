@@ -42,14 +42,14 @@ Não faça commits diretamente na `main`.
 
 ## Nomenclatura de branches
 
-Use o formato `tipo/descricao-curta-em-kebab-case`:
+Use o formato `tipo/nome-issue`:
 
 | Exemplo | Uso |
 |---|---|
-| `feat/ranking-tempo-real` | Nova funcionalidade |
-| `fix/erro-login-senha` | Correção de bug |
-| `refactor/servico-pontuacao` | Refatoração |
-| `docs/atualiza-readme` | Documentação |
+| `feat/SP-032-tela-cadastro` | Nova funcionalidade |
+| `fix/SP-032-tela-cadastro` | Correção de bug |
+| `refactor/SP-032-tela-cadastro` | Refatoração |
+| `docs/SP-032-tela-cadastro` | Documentação |
 
 ## Padrão de commits
 
