@@ -68,22 +68,6 @@ O diferencial é um espaço de compromisso **sem selfies vazias**. O foco está 
 ---
 
 ## Arquitetura
-
-```
-┌──────────────────────────┐        HTTP/JSON         ┌──────────────────────────┐
-│  Front-end (Next.js)     │ ───────────────────────▶ │  Back-end (FastAPI)      │
-│  Mobile-first, SSR/RSC   │ ◀─────────────────────── │  API REST + regras       │
-└──────────────────────────┘                          │  de negócio             │
-                                                      └─────────────┬────────────┘
-                                                                    │
-                                   ┌────────────────────────────────┼─────────────────┐
-                                   ▼                                ▼                 ▼
-                          ┌────────────────┐              ┌────────────────┐  ┌────────────────┐
-                          │ Banco de dados │              │  Chatbot       │  │ Armazenamento  │
-                          │ (a definir)    │              │  (LLM + RAG)   │  │ de fotos       │
-                          └────────────────┘              └────────────────┘  └────────────────┘
-```
-
 - **Front-end** em **Next.js**, servido como camada de interface e renderização.
 - **Back-end principal** em **FastAPI**, responsável pela API, autenticação, regras de desafios, pontuação e aprovação de check-ins.
 - **Chatbot** integrado ao back-end, com prompts customizados para planos de treino e dúvidas sobre esportes em geral.
