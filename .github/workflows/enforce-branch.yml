@@ -1,0 +1,17 @@
+name: Validar Branch de Origem
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  check-source-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verificar se vem da branch desenvolvimento
+        run: |
+          if [ "${{ github.head_ref }}" != "desenvolvimento" ]; then
+            echo "Erro: Pull Requests para a main só são permitidos saindo da branch 'desenvolvimento'."
+            exit 1
+          fi
